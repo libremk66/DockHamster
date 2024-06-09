@@ -51,7 +51,15 @@ func UpdateContainer(ctx *svc.ServiceContext, id string, name string, imageNameA
 		logx.Errorf("Failed to pull image: %s", err)
 		return err
 	}
-	decodePullResp(reader, ctx, taskID)
+	err = decodePullResp(reader, ctx, taskID)
+	if err != nil {
+		oldTaskProgress.Message = "拉取镜像失败"
+		oldTaskProgress.DetailMsg = err.Error()
+		oldTaskProgress.IsDone = true
+		ctx.UpdateProgress(taskID, oldTaskProgress)
+		logx.Errorf("Failed to pull image: %s", err)
+		return err
+	}
 	oldTaskProgress, result = ctx.GetProgress(taskID)
 	if !result {
 		oldTaskProgress = svc.TaskProgress{
