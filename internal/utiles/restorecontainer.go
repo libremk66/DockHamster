@@ -66,7 +66,12 @@ func RestoreContainer(ctx *svc.ServiceContext, filename string, taskID string) e
 			logx.Errorf("Failed to pull image: %s", err)
 			continue
 		}
-		decodePullResp(reader, ctx, taskID)
+		err = decodePullResp(reader, ctx, taskID)
+		if err != nil {
+			backupList = append(backupList, containerInfo.Config.Image+"拉取镜像出现错误"+err.Error())
+			logx.Errorf("Failed to pull image: %s", err)
+			continue
+		}
 		_, err = ctx.DockerClient.ContainerCreate(context.TODO(), containerInfo.Config, containerInfo.HostConfig, containerInfo.NetworkingConfig, nil, containerInfo.Name)
 		if err != nil {
 			logx.Error("Failed to create container: %s", err)

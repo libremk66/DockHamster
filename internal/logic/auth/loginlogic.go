@@ -46,7 +46,7 @@ func (l *LoginLogic) Login(req *types.LoginReq) (resp *types.Resp, err error) {
 		resp.Data = JwtResponse{Jwt: ""}
 		return resp, errors.New("生成 token出现错误，请重试")
 	}
-	resp.Code = 201
+	resp.Code = 200
 	resp.Msg = "success"
 	resp.Data = JwtResponse{Jwt: jwtToken}
 	return resp, nil

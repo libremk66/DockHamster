@@ -4,7 +4,6 @@ go 1.20
 
 require (
 	github.com/distribution/reference v0.5.0
-	github.com/docker/distribution v2.8.3+incompatible
 	github.com/docker/docker v25.0.1+incompatible
 	github.com/flosch/pongo2 v0.0.0-20200913210552-0d938eb266f3
 	github.com/golang-jwt/jwt v3.2.2+incompatible
