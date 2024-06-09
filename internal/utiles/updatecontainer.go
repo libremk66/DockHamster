@@ -181,7 +181,7 @@ func decodePullResp(reader io.Reader, ctx *svc.ServiceContext, taskID string) (e
 	}
 	for {
 		var msg dockerMsgType.JSONMessage
-		if err := decoder.Decode(&msg); err != nil {
+		if err = decoder.Decode(&msg); err != nil {
 			if err == io.EOF {
 				return nil
 			}
