@@ -199,7 +199,7 @@ func decodePullResp(reader io.Reader, ctx *svc.ServiceContext, taskID string) (e
 			oldTaskProgress.IsDone = true
 			ctx.UpdateProgress(taskID, oldTaskProgress)
 			logx.Errorf("Failed to decode pull image response: %s", err)
-			return
+			return fmt.Errorf("拉取镜像失败: %w", err)
 		}
 		// Print the progress or error information from the response
 		if msg.Error != nil {
@@ -209,7 +209,7 @@ func decodePullResp(reader io.Reader, ctx *svc.ServiceContext, taskID string) (e
 			oldTaskProgress.IsDone = true
 			ctx.UpdateProgress(taskID, oldTaskProgress)
 			logx.Errorf("Error: %s", msg.Error)
-			return
+			return fmt.Errorf("拉取镜像失败: %w", msg.Error)
 		} else {
 			var formattedMsg string
 			if msg.Progress != nil {
@@ -218,11 +218,9 @@ func decodePullResp(reader io.Reader, ctx *svc.ServiceContext, taskID string) (e
 				formattedMsg = fmt.Sprintf("进度%s", msg.Status)
 			}
 			oldTaskProgress.DetailMsg = formattedMsg
-			logx.Errorf("Error: %s", formattedMsg)
 			oldTaskProgress.Percentage = 25
 			ctx.UpdateProgress(taskID, oldTaskProgress)
-			logx.Infof("%s: %s\n", msg.Status, msg.Progress)
-			return
+			logx.Infof("拉取镜像进度\t %s: %s\n", msg.Status, msg.Progress)
 		}
 	}
 }
