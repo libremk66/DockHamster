@@ -58,6 +58,7 @@ func (i *ImageUpdateData) checkSingleImage(image types.Image) {
 		logx.Error("未在本地获取到repoDigest" + image.ImageName + ":" + image.ImageTag)
 		return
 	}
+	needUpdate := false
 	for _, localRepoDigests := range image.RepoDigests {
 		localDigest := strings.Split(localRepoDigests, "@")[1]
 		if remoteDigest != localDigest {
@@ -67,12 +68,13 @@ func (i *ImageUpdateData) checkSingleImage(image types.Image) {
 			}
 			logx.Info(image.ImageName + ":" + image.ImageTag + " need update")
 			logx.Infof("localDigest: %s, remoteDigest: %s", localDigest, remoteDigest)
-			i.Data[image.ID] = ImageCheckList{NeedUpdate: true}
-			return
+			needUpdate = true
 		} else {
 			logx.Info(image.ImageName + ":" + image.ImageTag + " not need update")
+			needUpdate = false
 		}
 	}
+	i.Data[image.ID] = ImageCheckList{NeedUpdate: needUpdate}
 }
 
 func BuildManifestURL(image types.Image) (string, error) {
