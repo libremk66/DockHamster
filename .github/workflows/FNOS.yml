@@ -1,4 +1,4 @@
-name: UGREEN
+name: FNOS
 
 on:
   workflow_dispatch:
