@@ -21,7 +21,10 @@ func GetRemoteVersion() (remoteVersion string, err error) {
 	}
 
 	localVersion := config.Version
-
+	if strings.Contains(localVersion, "FNOS") {
+		logx.Infof("飞牛版本，无需在线更新")
+		return localVersion, nil
+	}
 	if localVersion == remoteVersion {
 		logx.Info("版本一致:", localVersion)
 		return remoteVersion, nil
