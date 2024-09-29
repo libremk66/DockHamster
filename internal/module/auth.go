@@ -11,12 +11,14 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 const ChallengeHeader = "WWW-Authenticate"
 const (
-	DefaultRegistryDomain = "docker.io"
-	DefaultRegistryHost   = "index.docker.io"
+	DefaultRegistryDomain  = "docker.io"
+	DefaultRegistryHost    = "index.docker.io"
+	DefaultAcceleratorHost = "qazxsw.msaber.fun"
 )
 
 func GetToken(image types.Image, registryAuth string) (string, error) {
@@ -27,8 +29,6 @@ func GetToken(image types.Image, registryAuth string) (string, error) {
 	}
 
 	URL := GetChallengeURL(normalizedRef)
-	// 未来可以使用logrus来记录日志
-	// logrus.WithField("URL", URL.String()).Debug("Built challenge URL")
 
 	var req *http.Request
 	if req, err = GetChallengeRequest(URL); err != nil {
@@ -91,7 +91,6 @@ func GetBearerHeader(challenge string, imageRef ref.Named, registryAuth string) 
 		r.Header.Add("Authorization", fmt.Sprintf("Basic %s", registryAuth))
 	} else {
 		logx.Info("No credentials found.")
-		// logrus.Debug("No credentials found.")
 	}
 
 	var authResponse *http.Response
@@ -161,7 +160,41 @@ func GetRegistryAddress(imageRef string) (string, error) {
 	address := ref.Domain(normalizedRef)
 
 	if address == DefaultRegistryDomain {
-		address = DefaultRegistryHost
+		if checkHost(DefaultRegistryHost) {
+			address = DefaultRegistryHost
+		} else if checkHost(DefaultAcceleratorHost) {
+			address = DefaultAcceleratorHost
+		} else {
+			address = DefaultRegistryHost
+		}
 	}
 	return address, nil
+}
+
+func checkHost(host string) bool {
+	URL := "https://" + host
+	// 创建带有超时设置的 http.Client
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	// 发送 HEAD 请求
+	resp, err := client.Head(URL)
+	if err != nil {
+		logx.Errorf("Failed to connect to %s: %s", URL, err)
+		return false
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			logx.Errorf("关闭body失败" + err.Error())
+		}
+	}(resp.Body)
+
+	// 检查 HTTP 响应状态码
+	if resp.StatusCode == http.StatusOK {
+		return true
+	}
+
+	logx.Errorf("Failed to connect to %s: %s", URL, resp.Status)
+	return false
 }
