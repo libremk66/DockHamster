@@ -3,8 +3,8 @@ package utiles
 import (
 	"context"
 	"encoding/json"
-	docker "github.com/docker/docker/api/types"
 	dockerBackend "github.com/docker/docker/api/types/backend"
+	"github.com/docker/docker/api/types/image"
 	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/svc"
 	"github.com/zeromicro/go-zero/core/logx"
 	"os"
@@ -60,7 +60,7 @@ func RestoreContainer(ctx *svc.ServiceContext, filename string, taskID string) e
 			logx.Error("Failed to inspect container: %s", err)
 			return err
 		}
-		reader, err := ctx.DockerClient.ImagePull(context.TODO(), containerInfo.Config.Image, docker.ImagePullOptions{})
+		reader, err := ctx.DockerClient.ImagePull(context.TODO(), containerInfo.Config.Image, image.PullOptions{})
 		if err != nil {
 			backupList = append(backupList, containerInfo.Config.Image+"拉取镜像出现错误"+err.Error())
 			logx.Errorf("Failed to pull image: %s", err)

@@ -1,11 +1,11 @@
 package types
 
 import (
-	docker "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 )
 
 type Image struct {
-	docker.ImageSummary
+	image.Summary
 	ImageName  string `json:"imageName"`
 	ImageTag   string `json:"imageTag"`
 	InUsed     bool   `json:"inUsed"`

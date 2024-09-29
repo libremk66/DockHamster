@@ -2,12 +2,12 @@ package utiles
 
 import (
 	"context"
-	dockerTypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/svc"
 )
 
 func RemoveImage(ctx *svc.ServiceContext, imageID string, force bool) error {
-	_, err := ctx.DockerClient.ImageRemove(context.Background(), imageID, dockerTypes.ImageRemoveOptions{Force: force})
+	_, err := ctx.DockerClient.ImageRemove(context.Background(), imageID, image.RemoveOptions{Force: force})
 	if err != nil {
 		return err
 	}
