@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	dockerTypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	dockerMsgType "github.com/docker/docker/pkg/jsonmessage"
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/svc"
+	"github.com/onlyLTY/dockerCopilot/internal/svc"
 	"github.com/zeromicro/go-zero/core/logx"
 	"io"
 	"time"
@@ -42,7 +42,7 @@ func UpdateContainer(ctx *svc.ServiceContext, id string, name string, imageNameA
 	oldTaskProgress.DetailMsg = "正在拉取新镜像"
 	ctx.UpdateProgress(taskID, oldTaskProgress)
 	ctx.DockerClient.NegotiateAPIVersion(context.TODO())
-	reader, err := ctx.DockerClient.ImagePull(context.TODO(), imageNameAndTag, dockerTypes.ImagePullOptions{})
+	reader, err := ctx.DockerClient.ImagePull(context.TODO(), imageNameAndTag, image.PullOptions{})
 	if err != nil {
 		oldTaskProgress.Message = "拉取镜像失败"
 		oldTaskProgress.DetailMsg = err.Error()

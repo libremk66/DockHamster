@@ -3,8 +3,8 @@ package utiles
 import (
 	"context"
 	"github.com/docker/docker/api/types/container"
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/svc"
-	MyType "github.com/onlyLTY/dockerCopilot/UGREEN/internal/types"
+	"github.com/onlyLTY/dockerCopilot/internal/svc"
+	MyType "github.com/onlyLTY/dockerCopilot/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 

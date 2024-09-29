@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	ref "github.com/distribution/reference"
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/types"
+	"github.com/onlyLTY/dockerCopilot/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 	"io"
 	"net"
@@ -58,6 +58,7 @@ func (i *ImageUpdateData) checkSingleImage(image types.Image) {
 		logx.Error("未在本地获取到repoDigest" + image.ImageName + ":" + image.ImageTag)
 		return
 	}
+	needUpdate := false
 	for _, localRepoDigests := range image.RepoDigests {
 		localDigest := strings.Split(localRepoDigests, "@")[1]
 		if remoteDigest != localDigest {
@@ -67,12 +68,13 @@ func (i *ImageUpdateData) checkSingleImage(image types.Image) {
 			}
 			logx.Info(image.ImageName + ":" + image.ImageTag + " need update")
 			logx.Infof("localDigest: %s, remoteDigest: %s", localDigest, remoteDigest)
-			i.Data[image.ID] = ImageCheckList{NeedUpdate: true}
-			return
+			needUpdate = true
 		} else {
 			logx.Info(image.ImageName + ":" + image.ImageTag + " not need update")
+			needUpdate = false
 		}
 	}
+	i.Data[image.ID] = ImageCheckList{NeedUpdate: needUpdate}
 }
 
 func BuildManifestURL(image types.Image) (string, error) {
@@ -85,11 +87,11 @@ func BuildManifestURL(image types.Image) (string, error) {
 		return "", errors.New("镜像无tag" + normalizedRef.String())
 	}
 
-	host, _ := GetRegistryAddress(normalizedTaggedRef.Name())
+	host, ErrGetRegistryAddress := GetRegistryAddress(normalizedTaggedRef.Name())
 	img, tag := ref.Path(normalizedTaggedRef), normalizedTaggedRef.Tag()
 
-	if err != nil {
-		return "", err
+	if ErrGetRegistryAddress != nil {
+		return "", ErrGetRegistryAddress
 	}
 
 	url := url2.URL{

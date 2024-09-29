@@ -5,10 +5,14 @@ import (
 	"flag"
 	"fmt"
 	loader "github.com/nathan-osman/pongo2-embed-loader"
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/handler"
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/utiles"
+	"github.com/onlyLTY/dockerCopilot/internal/config"
+	"github.com/onlyLTY/dockerCopilot/internal/handler"
+	"github.com/onlyLTY/dockerCopilot/internal/svc"
+	"github.com/onlyLTY/dockerCopilot/internal/utiles"
 	"github.com/robfig/cron/v3"
+	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/logx"
+	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/zeromicro/x/errors"
 	xhttp "github.com/zeromicro/x/http"
@@ -16,11 +20,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/config"
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/svc"
-	"github.com/zeromicro/go-zero/core/conf"
-	"github.com/zeromicro/go-zero/rest"
 )
 
 var configFile = flag.String("f", "etc/dockerCopilot.yaml", "the config file")
@@ -35,8 +34,14 @@ type UnauthorizedResponse struct {
 var content embed.FS
 
 func main() {
-	flag.Parse()
+	logDir := "./logs"
+	ErrSetupLog := SetupLog(logDir)
+	if ErrSetupLog != nil {
+		logx.Errorf("failed to setup log: %v", ErrSetupLog)
+		os.Exit(1)
+	}
 
+	flag.Parse()
 	var c config.Config
 	err := conf.Load(*configFile, &c, conf.UseEnv())
 	if err != nil {
@@ -141,4 +146,31 @@ func RegisterHandlers(engine *rest.Server) {
 
 		//logx.Infof("register dir  %s  %s", path, dirpath)
 	}
+}
+
+// 检查并创建日志目录
+func ensureLogDirectory(logDir string) error {
+	if _, err := os.Stat(logDir); os.IsNotExist(err) {
+		return os.MkdirAll(logDir, 0755) // 创建目录并设置权限
+	}
+	return nil
+}
+
+// SetupLog 初始化日志设置
+func SetupLog(logDir string) error {
+	// 检查日志目录是否存在
+	if err := ensureLogDirectory(logDir); err != nil {
+		return fmt.Errorf("failed to create log directory: %v", err)
+	}
+
+	logConf := logx.LogConf{
+		Path:     logDir,
+		Level:    "info",
+		KeepDays: 7,
+		Compress: true,
+		Mode:     "file",
+	}
+	logx.MustSetup(logConf)
+	logx.AddWriter(logx.NewWriter(os.Stdout))
+	return nil
 }

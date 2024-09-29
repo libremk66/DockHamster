@@ -4,12 +4,12 @@ package handler
 import (
 	"net/http"
 
-	auth "github.com/onlyLTY/dockerCopilot/UGREEN/internal/handler/auth"
-	container "github.com/onlyLTY/dockerCopilot/UGREEN/internal/handler/container"
-	image "github.com/onlyLTY/dockerCopilot/UGREEN/internal/handler/image"
-	progress "github.com/onlyLTY/dockerCopilot/UGREEN/internal/handler/progress"
-	version "github.com/onlyLTY/dockerCopilot/UGREEN/internal/handler/version"
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/svc"
+	auth "github.com/onlyLTY/dockerCopilot/internal/handler/auth"
+	container "github.com/onlyLTY/dockerCopilot/internal/handler/container"
+	image "github.com/onlyLTY/dockerCopilot/internal/handler/image"
+	progress "github.com/onlyLTY/dockerCopilot/internal/handler/progress"
+	version "github.com/onlyLTY/dockerCopilot/internal/handler/version"
+	"github.com/onlyLTY/dockerCopilot/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
 )
