@@ -1,9 +1,9 @@
 package container
 
 import (
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/logic/container"
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/svc"
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/types"
+	"github.com/onlyLTY/dockerCopilot/internal/logic/container"
+	"github.com/onlyLTY/dockerCopilot/internal/svc"
+	"github.com/onlyLTY/dockerCopilot/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
 	"net/http"
 )

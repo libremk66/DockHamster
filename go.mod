@@ -1,4 +1,4 @@
-module github.com/onlyLTY/dockerCopilot/UGREEN
+module github.com/onlyLTY/dockerCopilot
 
 go 1.22
 

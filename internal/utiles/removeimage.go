@@ -3,7 +3,7 @@ package utiles
 import (
 	"context"
 	"github.com/docker/docker/api/types/image"
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/svc"
+	"github.com/onlyLTY/dockerCopilot/internal/svc"
 )
 
 func RemoveImage(ctx *svc.ServiceContext, imageID string, force bool) error {

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	ref "github.com/distribution/reference"
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/types"
+	"github.com/onlyLTY/dockerCopilot/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 	"io"
 	"net"
@@ -87,11 +87,11 @@ func BuildManifestURL(image types.Image) (string, error) {
 		return "", errors.New("镜像无tag" + normalizedRef.String())
 	}
 
-	host, _ := GetRegistryAddress(normalizedTaggedRef.Name())
+	host, ErrGetRegistryAddress := GetRegistryAddress(normalizedTaggedRef.Name())
 	img, tag := ref.Path(normalizedTaggedRef), normalizedTaggedRef.Tag()
 
-	if err != nil {
-		return "", err
+	if ErrGetRegistryAddress != nil {
+		return "", ErrGetRegistryAddress
 	}
 
 	url := url2.URL{

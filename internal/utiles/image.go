@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/docker/docker/api/types/image"
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/svc"
-	MyType "github.com/onlyLTY/dockerCopilot/UGREEN/internal/types"
+	"github.com/onlyLTY/dockerCopilot/internal/svc"
+	MyType "github.com/onlyLTY/dockerCopilot/internal/types"
 	"log"
 	"strings"
 )

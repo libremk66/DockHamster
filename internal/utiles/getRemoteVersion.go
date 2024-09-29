@@ -1,7 +1,7 @@
 package utiles
 
 import (
-	"github.com/onlyLTY/dockerCopilot/UGREEN/internal/config"
+	"github.com/onlyLTY/dockerCopilot/internal/config"
 	"github.com/zeromicro/go-zero/core/logx"
 	"io"
 	"net/http"
