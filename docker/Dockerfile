@@ -15,6 +15,7 @@ RUN apk add --no-cache tzdata \
 # 设置环境变量
 ENV secretKey="" \
     DOCKER_HOST="tcp://127.0.0.1:9375" \
+    BACKUP_DIR="/data" \
     TZ="Asia/Shanghai"
 
 VOLUME ["/data"]
