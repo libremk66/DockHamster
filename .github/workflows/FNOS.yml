@@ -6,7 +6,7 @@ on:
     branches:
       - UGREEN
     paths:
-      - version
+      - fn_version
 
 jobs:
   build:
