@@ -18,7 +18,7 @@ const ChallengeHeader = "WWW-Authenticate"
 const (
 	DefaultRegistryDomain  = "docker.io"
 	DefaultRegistryHost    = "index.docker.io"
-	DefaultAcceleratorHost = "qazxsw.msaber.fun"
+	DefaultAcceleratorHost = "docker.ketches.cn"
 )
 
 func GetToken(image types.Image, registryAuth string) (string, error) {
@@ -172,7 +172,7 @@ func GetRegistryAddress(imageRef string) (string, error) {
 }
 
 func checkHost(host string) bool {
-	URL := "https://" + host
+	URL := "https://" + host + "/v2/"
 	// 创建带有超时设置的 http.Client
 	client := http.Client{
 		Timeout: 5 * time.Second,
@@ -191,7 +191,7 @@ func checkHost(host string) bool {
 	}(resp.Body)
 
 	// 检查 HTTP 响应状态码
-	if resp.StatusCode == http.StatusOK {
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusUnauthorized {
 		return true
 	}
 
