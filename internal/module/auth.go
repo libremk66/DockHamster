@@ -18,7 +18,7 @@ const ChallengeHeader = "WWW-Authenticate"
 const (
 	DefaultRegistryDomain  = "docker.io"
 	DefaultRegistryHost    = "index.docker.io"
-	DefaultAcceleratorHost = "docker.ketches.cn"
+	DefaultAcceleratorHost = "docker.lieying.fun"
 )
 
 func GetToken(image types.Image, registryAuth string) (string, error) {
