@@ -37,7 +37,7 @@ services:
       - TZ=Asia/Shanghai
       - DOCKER_HOST=unix:///var/run/docker.sock
       - secretKey=密码，不少于八位且非纯数字
-    image: 0nlylty/dockercopilot:UGREEN
+    image: 0nlylty/dockercopilot:latest
 ```
 
 ## 开发环境
