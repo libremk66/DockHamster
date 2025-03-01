@@ -17,6 +17,29 @@
 8. 备份容器设置
 9. 恢复容器设置
 
+## 使用
+
+docker compose 安装
+
+```
+services:
+  dockercopilot:
+    container_name: dockercopilot
+    restart: always
+    privileged: true
+    network_mode: bridge
+    ports:
+      - 12712:12712
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data:/data
+    environment:
+      - TZ=Asia/Shanghai
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - secretKey=密码，不少于八位且非纯数字
+    image: 0nlylty/dockercopilot:UGREEN
+```
+
 ## 开发环境
 
 go版本：1.21+
