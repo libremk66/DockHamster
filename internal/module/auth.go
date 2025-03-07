@@ -16,10 +16,13 @@ import (
 
 const ChallengeHeader = "WWW-Authenticate"
 const (
-	DefaultRegistryDomain  = "docker.io"
-	DefaultRegistryHost    = "index.docker.io"
-	DefaultAcceleratorHost = "docker.lieying.fun"
+	DefaultRegistryDomain = "docker.io"
+	DefaultRegistryHost   = "index.docker.io"
 )
+
+var DefaultAcceleratorHostList = []string{"docker.1ms.run", "docker.m.daocloud.io",
+	"docker.1panel.top", "docker.1panel.live", "proxy.1panel.live", "dockerproxy.1panel.live", "docker.1panel.dev",
+	"docker.anye.in", "hub.rat.dev", "docker.amingg.com"}
 
 func GetToken(image types.Image, registryAuth string) (string, error) {
 	logx.Infof("image name %s", image.ImageName)
@@ -162,9 +165,15 @@ func GetRegistryAddress(imageRef string) (string, error) {
 	if address == DefaultRegistryDomain {
 		if checkHost(DefaultRegistryHost) {
 			address = DefaultRegistryHost
-		} else if checkHost(DefaultAcceleratorHost) {
-			address = DefaultAcceleratorHost
 		} else {
+			for _, host := range DefaultAcceleratorHostList {
+				if checkHost(host) {
+					address = host
+					break
+				}
+			}
+		}
+		if address == DefaultRegistryDomain {
 			address = DefaultRegistryHost
 		}
 	}
@@ -178,7 +187,7 @@ func checkHost(host string) bool {
 		Timeout: 5 * time.Second,
 	}
 	// 发送 HEAD 请求
-	resp, err := client.Head(URL)
+	resp, err := client.Get(URL)
 	if err != nil {
 		logx.Errorf("Failed to connect to %s: %s", URL, err)
 		return false
@@ -191,7 +200,8 @@ func checkHost(host string) bool {
 	}(resp.Body)
 
 	// 检查 HTTP 响应状态码
-	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusUnauthorized {
+	if resp.StatusCode == http.StatusOK ||
+		resp.StatusCode == http.StatusUnauthorized {
 		return true
 	}
 
