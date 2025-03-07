@@ -1,12 +1,6 @@
 name: docker-build-push
 
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - UGREEN
-    paths:
-      - version
+on: push
 
 jobs:
   build:
@@ -48,5 +42,5 @@ jobs:
           file: ./docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/dockercopilot:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/dockercopilot:latest-dev
           push: true

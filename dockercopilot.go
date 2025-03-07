@@ -40,6 +40,7 @@ func main() {
 		logx.Errorf("failed to setup log: %v", ErrSetupLog)
 		os.Exit(1)
 	}
+	logx.SetLevel(logx.InfoLevel)
 
 	flag.Parse()
 	var c config.Config
