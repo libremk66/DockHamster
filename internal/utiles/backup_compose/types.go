@@ -5,5 +5,5 @@ import (
 )
 
 type composeYaml struct {
-	Service map[string]composeType.ServiceConfig `yaml:"service"`
+	Services map[string]composeType.ServiceConfig `yaml:"services"`
 }

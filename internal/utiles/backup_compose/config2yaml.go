@@ -16,14 +16,14 @@ import (
 // DockerConfig2ComposeYaml 将docker config转换为docker-compose.yaml
 func DockerConfig2ComposeYaml(containerJSONs []dockerTypes.ContainerJSON) (err error) {
 	var c composeYaml
-	c.Service = make(map[string]composeType.ServiceConfig, len(containerJSONs))
+	c.Services = make(map[string]composeType.ServiceConfig, len(containerJSONs))
 	for _, containerJSON := range containerJSONs {
 		var s composeType.ServiceConfig
 		formatBaseServiceConfig(containerJSON, &s)
 		formatEnvServiceConfig(containerJSON, &s)
 		formatNetworkServiceConfig(containerJSON, &s)
 		formatVolumeServiceConfig(containerJSON, &s)
-		c.Service[containerJSON.Name] = s
+		c.Services[s.Name] = s
 	}
 	// write to file
 	backupDir := os.Getenv("BACKUP_DIR") // 从环境变量中获取备份目录
