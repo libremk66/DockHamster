@@ -16,6 +16,7 @@ import (
 // DockerConfig2ComposeYaml 将docker config转换为docker-compose.yaml
 func DockerConfig2ComposeYaml(containerJSONs []dockerTypes.ContainerJSON) (err error) {
 	var c composeYaml
+	c.Service = make(map[string]composeType.ServiceConfig, len(containerJSONs))
 	for _, containerJSON := range containerJSONs {
 		var s composeType.ServiceConfig
 		formatBaseServiceConfig(containerJSON, &s)
