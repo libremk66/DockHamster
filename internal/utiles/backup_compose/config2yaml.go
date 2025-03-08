@@ -84,7 +84,7 @@ func formatNetworkServiceConfig(containerJSON dockerTypes.ContainerJSON, s *comp
 	s.NetworkMode = string(containerJSON.HostConfig.NetworkMode)
 	for containerPort, v := range containerJSON.HostConfig.PortBindings {
 		var p composeType.ServicePortConfig
-		port, proto := composeNat.SplitProtoPort(string(containerPort))
+		proto, port := composeNat.SplitProtoPort(string(containerPort))
 		portNum, convertErr := strconv.Atoi(port)
 		if convertErr != nil {
 			logx.Errorf("Error converting port err is: %v", convertErr)
