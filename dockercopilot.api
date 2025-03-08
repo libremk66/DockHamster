@@ -3,40 +3,51 @@ syntax = "v1"
 type DoLoginReq {
 	SecretKey string `form:"secret_key,optional"`
 }
+
 type LoginReq {
 	SecretKey string `form:"secretKey,optional"`
 }
+
 type VerifyJwtReq {
 	Jwt string `form:"jwt,optional"`
 }
+
 type GetProgressReq {
 	TaskId string `path:"taskid"`
 }
+
 type StartContainerReq {
 	Name string `json:"name"`
 }
+
 type StopContainerReq {
 	Name string `json:"name"`
 }
+
 type RenameContainerReq {
 	OldName string `json:"oldName"`
 	NewName string `json:"newName"`
 }
+
 type CreateContainerReq {
 	OldName         string `json:"old_name"`
 	NewName         string `json:"new_name"`
 	ImageNameAndTag string `json:"image_name_and_tag"`
 }
+
 type RemoveContainerReq {
 	Name string `json:"name"`
 }
+
 type getNewImageReq {
 	ImageNameAndTag string `json:"image_name_and_tag"`
 }
+
 type MsgResp {
 	Status string `json:"status"`
 	Msg    string `json:"msg"`
 }
+
 type Resp {
 	Code int         `json:"code"`
 	Msg  string      `json:"msg"`
@@ -78,7 +89,7 @@ type VersionReq {
 
 service dockerCopilot {
 	@handler webindex
-	get / () returns ()
+		get /
 }
 
 @server(
@@ -87,7 +98,7 @@ service dockerCopilot {
 )
 service dockerCopilot {
 	@handler Login
-	post /auth (LoginReq) returns (Resp);
+		post /auth (LoginReq) returns (Resp)
 }
 
 @server(
@@ -96,7 +107,7 @@ service dockerCopilot {
 )
 service dockerCopilot {
 	@handler GetProgress
-	get /progress/:taskid (GetProgressReq) returns (Resp);
+		get /progress/:taskid (GetProgressReq) returns (Resp)
 }
 
 @server(
@@ -125,6 +136,9 @@ service dockerCopilot {
 
 	@handler backup
 	get /container/backup returns (Resp)
+
+	@handler backup2compose
+	get /container/backup2compose returns (Resp)
 
 	@handler listBackups
 	get /container/listBackups returns (Resp)
@@ -156,8 +170,9 @@ service dockerCopilot {
 )
 service dockerCopilot {
 	@handler version
-	get /version (VersionReq) returns (Resp);
+		get /version (VersionReq) returns (Resp)
 
 	@handler updateProgram
-	put /program () returns (Resp);
+		put /program returns (Resp)
 }
+
