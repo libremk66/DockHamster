@@ -62,11 +62,15 @@ func formatBaseServiceConfig(containerJSON dockerTypes.ContainerJSON, s *compose
 	s.ContainerName = name
 	s.Name = name
 	s.Tty = containerJSON.Config.Tty
-	s.Entrypoint = composeType.ShellCommand(containerJSON.Config.Entrypoint)
+	if containerJSON.Config.Entrypoint != nil {
+		s.Entrypoint = composeType.ShellCommand(containerJSON.Config.Entrypoint)
+	}
 	s.WorkingDir = containerJSON.Config.WorkingDir
 	s.Restart = string(containerJSON.HostConfig.RestartPolicy.Name)
 	s.Privileged = containerJSON.HostConfig.Privileged
-	s.Command = composeType.ShellCommand(containerJSON.Config.Cmd)
+	if containerJSON.Config.Cmd != nil {
+		s.Command = composeType.ShellCommand(containerJSON.Config.Cmd)
+	}
 	return
 }
 
