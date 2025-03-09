@@ -62,17 +62,11 @@ func formatBaseServiceConfig(containerJSON dockerTypes.ContainerJSON, s *compose
 	s.ContainerName = name
 	s.Name = name
 	s.Tty = containerJSON.Config.Tty
-	entrypointErr := s.Entrypoint.DecodeMapstructure(containerJSON.Config.Entrypoint)
-	if entrypointErr != nil {
-		logx.Errorf("Error decoding entrypoint err is: %v", entrypointErr)
-	}
-	cmdErr := s.Command.DecodeMapstructure(containerJSON.Config.Cmd)
-	if cmdErr != nil {
-		logx.Errorf("Error decoding cmd err is: %v", cmdErr)
-	}
+	s.Entrypoint = composeType.ShellCommand(containerJSON.Config.Entrypoint)
 	s.WorkingDir = containerJSON.Config.WorkingDir
 	s.Restart = string(containerJSON.HostConfig.RestartPolicy.Name)
 	s.Privileged = containerJSON.HostConfig.Privileged
+	s.Command = composeType.ShellCommand(containerJSON.Config.Cmd)
 	return
 }
 
