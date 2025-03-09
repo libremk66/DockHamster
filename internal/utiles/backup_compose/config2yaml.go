@@ -15,7 +15,7 @@ import (
 
 // DockerConfig2ComposeYaml 将docker config转换为docker-compose.yaml
 func DockerConfig2ComposeYaml(containerJSONs []dockerTypes.ContainerJSON) (err error) {
-	var c composeYaml
+	var c ComposeYaml
 	c.Services = make(map[string]composeType.ServiceConfig, len(containerJSONs))
 	for _, containerJSON := range containerJSONs {
 		var s composeType.ServiceConfig
@@ -60,7 +60,7 @@ func formatBaseServiceConfig(containerJSON dockerTypes.ContainerJSON, s *compose
 		logx.Infof("cutting name is: %s", containerJSON.Name)
 	}
 	s.ContainerName = name
-	s.Name = containerJSON.Name
+	s.Name = name
 	s.Tty = containerJSON.Config.Tty
 	entrypointErr := s.Entrypoint.DecodeMapstructure(containerJSON.Config.Entrypoint)
 	if entrypointErr != nil {
