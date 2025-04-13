@@ -6,7 +6,6 @@ WORKDIR /app
 ARG TARGETPLATFORM
 
 COPY dc-back/dist/$TARGETPLATFORM/dockerCopilot ${WORKDIR}/dockerCopilot
-COPY dc-front/. ${WORKDIR}/front
 COPY dc-back/etc/. ${WORKDIR}/etc
 COPY start.sh ${WORKDIR}/start.sh
 
