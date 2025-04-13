@@ -4,7 +4,6 @@ import (
 	"embed"
 	"flag"
 	"fmt"
-	loader "github.com/nathan-osman/pongo2-embed-loader"
 	"github.com/onlyLTY/dockerCopilot/internal/config"
 	"github.com/onlyLTY/dockerCopilot/internal/handler"
 	"github.com/onlyLTY/dockerCopilot/internal/svc"
@@ -17,10 +16,14 @@ import (
 	"github.com/zeromicro/x/errors"
 	xhttp "github.com/zeromicro/x/http"
 	"go/types"
+	"io/fs"
+	"log"
 	"net/http"
 	"os"
-	"strings"
 )
+
+//go:embed front/*
+var embeddedFront embed.FS
 
 var configFile = flag.String("f", "etc/dockerCopilot.yaml", "the config file")
 
@@ -29,9 +32,6 @@ type UnauthorizedResponse struct {
 	Msg  string                 `json:"msg"`
 	Data map[string]interface{} `json:"data"`
 }
-
-//go:embed templates/*
-var content embed.FS
 
 func main() {
 	logDir := "./logs"
@@ -60,7 +60,7 @@ func main() {
 			httpx.WriteJson(w, http.StatusUnauthorized, response)
 		}))
 	defer server.Stop()
-	ctx := svc.NewServiceContext(c, &loader.Loader{Content: content})
+	ctx := svc.NewServiceContext(c)
 	list, err := utiles.GetImagesList(ctx)
 	if err != nil {
 		logx.Errorf("panic获取镜像列表出错: %v", err)
@@ -105,48 +105,38 @@ func main() {
 	server.Start()
 }
 func RegisterHandlers(engine *rest.Server) {
-
-	//这里注册
-	dirlevel := []string{":1", ":2", ":3", ":4", ":5", ":6", ":7", ":8"}
-	patern := "/static/"
-	dirpath := "./static/"
-	for i := 1; i < len(dirlevel); i++ {
-		path := patern + strings.Join(dirlevel[:i], "/")
-		//最后生成 /asset
-		engine.AddRoute(
-			rest.Route{
-				Method:  http.MethodGet,
-				Path:    path,
-				Handler: http.StripPrefix(patern, http.FileServer(http.Dir(dirpath))).ServeHTTP,
-			})
-
-		//logx.Infof("register dir  %s  %s", path, dirpath)
+	frontFS, err := fs.Sub(embeddedFront, "front")
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	engine.AddRoute(
-		rest.Route{
-			Method: http.MethodGet,
-			Path:   "/manager/",
-			Handler: func(w http.ResponseWriter, r *http.Request) {
-				http.ServeFile(w, r, "./templates/index.html")
+	frontFileServer := http.StripPrefix("/manager", http.FileServer(http.FS(frontFS)))
+
+	engine.AddRoutes(
+		[]rest.Route{
+			{
+				Method: http.MethodGet,
+				Path:   "/manager",
+				Handler: func(w http.ResponseWriter, r *http.Request) {
+					frontFileServer.ServeHTTP(w, r)
+				},
+			},
+			{
+				Method: http.MethodGet,
+				Path:   "/manager/:path",
+				Handler: func(w http.ResponseWriter, r *http.Request) {
+					frontFileServer.ServeHTTP(w, r)
+				},
+			},
+			{
+				Method: http.MethodGet,
+				Path:   "/manager/assets/:path",
+				Handler: func(w http.ResponseWriter, r *http.Request) {
+					frontFileServer.ServeHTTP(w, r)
+				},
 			},
 		},
 	)
-
-	managerPatern := "/manager/"
-	managerDirpath := "./templates/"
-	for i := 1; i < len(dirlevel); i++ {
-		path := managerPatern + strings.Join(dirlevel[:i], "/")
-		//最后生成 /asset
-		engine.AddRoute(
-			rest.Route{
-				Method:  http.MethodGet,
-				Path:    path,
-				Handler: http.StripPrefix(managerPatern, http.FileServer(http.Dir(managerDirpath))).ServeHTTP,
-			})
-
-		//logx.Infof("register dir  %s  %s", path, dirpath)
-	}
 }
 
 // 检查并创建日志目录
