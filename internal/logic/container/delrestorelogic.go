@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"net/url"
 	"os"
 	"regexp"
 
@@ -25,14 +26,20 @@ func NewDelRestoreLogic(ctx context.Context, svcCtx *svc.ServiceContext) *DelRes
 	}
 }
 
-func (l *DelRestoreLogic) DelRestore(req *types.ContainerRestoreReq) (resp *types.Resp, err error) {
+func (l *DelRestoreLogic) DelRestore(req *types.DelContainerBackupReq) (resp *types.Resp, err error) {
 	resp = &types.Resp{}
-	fileName := CleanFilename(req.Filename)
+	fileName, err := url.QueryUnescape(req.Filename)
+	if err != nil {
+		resp.Code = 400
+		resp.Msg = "文件名解码失败"
+		resp.Data = map[string]interface{}{}
+		return resp, nil
+	}
 	basePath := os.Getenv("BACKUP_DIR") // 从环境变量中获取备份目录
 	if basePath == "" {
 		basePath = "/data/backups" // 如果环境变量未设置，使用默认值
 	}
-	fullPath := basePath + "/" + fileName + ".json"
+	fullPath := basePath + "/" + fileName
 	err = os.Remove(fullPath)
 	if err != nil {
 		resp.Code = 400

@@ -59,7 +59,11 @@ type IdReq {
 }
 
 type ContainerRestoreReq {
-	Filename string `path:"filename"`
+	Filename string `json:"filename"`
+}
+
+type DelContainerBackupReq {
+	Filename string `form:"filename"`
 }
 
 type ContainerRenameReq {
@@ -144,10 +148,10 @@ service dockerCopilot {
 	get /container/listBackups returns (Resp)
 
 	@handler restore
-	post /container/backups/:filename/restore (ContainerRestoreReq) returns (Resp)
+		post /container/backups/restore (ContainerRestoreReq) returns (Resp)
 
 	@handler delRestore
-	delete /container/backups/:filename (ContainerRestoreReq) returns (Resp)
+		delete /container/backups (DelContainerBackupReq) returns (Resp)
 }
 
 @server(
