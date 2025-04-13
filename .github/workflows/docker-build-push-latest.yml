@@ -58,6 +58,14 @@ jobs:
         run: |
           echo "version=$(cat version)" >> $GITHUB_ENV
 
+      - name: Cache Go Modules
+        uses: actions/cache@v3
+        with:
+          path: ${{ github.workspace }}/msaber-back/pkg/mod
+          key: go-mod-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            go-mod-
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
