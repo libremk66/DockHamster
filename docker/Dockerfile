@@ -4,11 +4,12 @@ LABEL authors="onlyLTY"
 WORKDIR /app
 
 ARG TARGETPLATFORM
-# 复制适当的平台二进制文件
-COPY dist/$TARGETPLATFORM/dockerCopilot /app/dockerCopilot
 
-# 复制其他需要的文件或目录，例如 start.sh
-COPY . ${WORKDIR}
+COPY dc-back/dist/$TARGETPLATFORM/dockerCopilot ${WORKDIR}/dockerCopilot
+COPY dc-front/. ${WORKDIR}/front
+COPY dc-back/etc/. ${WORKDIR}/etc
+COPY start.sh ${WORKDIR}/start.sh
+
 RUN apk add --no-cache tzdata \
     && chmod +x start.sh
 
