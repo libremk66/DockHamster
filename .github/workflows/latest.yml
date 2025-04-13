@@ -1,4 +1,4 @@
-name: UGREEN
+name: latest
 
 on:
   workflow_dispatch:
