@@ -5,9 +5,9 @@ WORKDIR /app
 
 ARG TARGETPLATFORM
 
-COPY dc-back/dist/$TARGETPLATFORM/dockerCopilot ${WORKDIR}/dockerCopilot
-COPY dc-back/etc/. ${WORKDIR}/etc
-COPY start.sh ${WORKDIR}/start.sh
+COPY dc-back/dist/$TARGETPLATFORM/dockerCopilot ./dockerCopilot
+COPY dc-back/etc/. ./etc
+COPY start.sh ./start.sh
 
 RUN apk add --no-cache tzdata \
     && chmod +x start.sh
