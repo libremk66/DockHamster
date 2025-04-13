@@ -54,11 +54,6 @@ jobs:
         with:
           go-version: '1.23.4'
 
-      - name: Get version from file
-        id: get_version
-        run: |
-          echo "version=$(cat version)" >> $GITHUB_ENV
-
       - name: Build for ${{ matrix.arch }}
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.arch }} go build -a --trimpath -ldflags="-w -s -X 'github.com/onlyLTY/dockerCopilot/internal/config.Version=${{ env.version }}' -X 'github.com/onlyLTY/dockerCopilot/internal/config.BuildDate=$(date)'" -o dist/linux/${{ matrix.arch }}/dockerCopilot .
