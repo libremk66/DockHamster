@@ -10,7 +10,8 @@ COPY dc-back/etc/. ./etc
 COPY start.sh ./start.sh
 
 RUN apk add --no-cache tzdata \
-    && chmod +x start.sh
+    && chmod +x start.sh \
+    && chmod +x dockerCopilot \
 
 # 设置环境变量
 ENV secretKey="" \
