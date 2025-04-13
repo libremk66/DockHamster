@@ -12,7 +12,6 @@ jobs:
           repository: onlyLTY/dockerCopilotWeb
           path: './frontend'
           ref: 'main'
-          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
