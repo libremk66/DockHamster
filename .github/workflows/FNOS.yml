@@ -84,7 +84,7 @@ jobs:
 
       - name: Compress binary
         run: |
-          tar -czvf dockerCopilot-${{ matrix.goarch }}.tar.gz dockerCopilot-new
+          tar -czvf dockerCopilot-${{ matrix.arch }}.tar.gz dockerCopilot-new
 
       - name: List current directory
         run: ls -la
@@ -112,8 +112,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Asset for ${{ matrix.goarch }}
+      - name: Upload Asset for ${{ matrix.arch }}
         run: |
-          gh release upload ${{ env.version }} dockerCopilot-${{ matrix.goarch }}.tar.gz
+          gh release upload ${{ env.version }} dockerCopilot-${{ matrix.arch }}.tar.gz
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
