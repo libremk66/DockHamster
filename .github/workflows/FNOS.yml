@@ -84,7 +84,7 @@ jobs:
 
       - name: Compress binary
         run: |
-          tar -czvf dockerCopilot-${{ matrix.arch }}.tar.gz dockerCopilot-new
+          tar -czvf dockerCopilot-${{ matrix.arch }}.tar.gz dist/linux/${{ matrix.arch }}/dockerCopilot-new
 
       - name: List current directory
         run: ls -la
