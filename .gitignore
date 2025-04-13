@@ -28,3 +28,5 @@ venv/
 # 忽略 __pycache__ 目录及其中的所有文件
 __pycache__/
 /db.sqlite3
+/front/
+/logs/

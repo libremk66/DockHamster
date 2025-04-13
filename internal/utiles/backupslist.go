@@ -18,7 +18,9 @@ func BackupList(ctx *svc.ServiceContext) ([]string, error) {
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".json" {
-			backupList = append(backupList, entry.Name()[:len(entry.Name())-5])
+			backupList = append(backupList, entry.Name())
+		} else if !entry.IsDir() && filepath.Ext(entry.Name()) == ".yaml" {
+			backupList = append(backupList, entry.Name())
 		}
 	}
 

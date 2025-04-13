@@ -4,13 +4,14 @@ LABEL authors="onlyLTY"
 WORKDIR /app
 
 ARG TARGETPLATFORM
-# 复制适当的平台二进制文件
-COPY dist/$TARGETPLATFORM/dockerCopilot /app/dockerCopilot
 
-# 复制其他需要的文件或目录，例如 start.sh
-COPY . ${WORKDIR}
+COPY dc-back/dist/$TARGETPLATFORM/dockerCopilot ./dockerCopilot
+COPY dc-back/etc/. ./etc
+COPY start.sh ./start.sh
+
 RUN apk add --no-cache tzdata \
-    && chmod +x start.sh
+    && chmod +x start.sh \
+    && chmod +x dockerCopilot
 
 # 设置环境变量
 ENV secretKey="" \

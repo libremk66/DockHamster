@@ -19,7 +19,7 @@ func RestoreContainer(ctx *svc.ServiceContext, filename string, taskID string) e
 	if basePath == "" {
 		basePath = "/data/backups" // 如果环境变量未设置，使用默认值
 	}
-	fullPath := filepath.Join(basePath, filename+".json")
+	fullPath := filepath.Join(basePath, filename)
 	oldProgress := svc.TaskProgress{
 		TaskID:     taskID,
 		Percentage: 0,

@@ -2,8 +2,10 @@ package container
 
 import (
 	"context"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/onlyLTY/dockerCopilot/internal/utiles"
+	"path/filepath"
 
 	"github.com/onlyLTY/dockerCopilot/internal/svc"
 	"github.com/onlyLTY/dockerCopilot/internal/types"
@@ -29,6 +31,13 @@ func (l *RestoreLogic) Restore(req *types.ContainerRestoreReq) (resp *types.Resp
 	resp = &types.Resp{}
 	taskID := uuid.New().String()
 	fileName := CleanFilename(req.Filename)
+	if filepath.Ext(fileName) != ".json" {
+		err = fmt.Errorf("目前仅支持config备份恢复")
+		resp.Code = 400
+		resp.Msg = err.Error()
+		resp.Data = map[string]interface{}{}
+		return resp, err
+	}
 	go func() {
 		// Catch any panic and log the error
 		defer func() {
