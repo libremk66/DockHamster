@@ -1,4 +1,4 @@
-name: docker-build-push-UGREEN
+name: docker-build-push-UGREEN-stable
 
 on:
   workflow_dispatch:

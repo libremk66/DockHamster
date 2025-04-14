@@ -1,4 +1,4 @@
-name: docker-build-push-latest
+name: docker-build-push-latest-stable
 
 on:
   workflow_dispatch:

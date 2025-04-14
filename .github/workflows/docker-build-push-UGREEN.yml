@@ -1,12 +1,10 @@
-name: docker-build-push-UGREEN
+name: docker-build-push-UGREEN-dev
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - UGREEN
-    paths:
-      - ugreen_version
+      - UGREEN-DEV
 
 jobs:
   build-frontend:
@@ -126,5 +124,5 @@ jobs:
           file: ./docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/dockercopilot:UGREEN
+            ${{ secrets.DOCKERHUB_USERNAME }}/dockercopilot:UGREEN-DEV
           push: true
