@@ -30,7 +30,7 @@ func NewRestoreLogic(ctx context.Context, svcCtx *svc.ServiceContext) *RestoreLo
 func (l *RestoreLogic) Restore(req *types.ContainerRestoreReq) (resp *types.Resp, err error) {
 	resp = &types.Resp{}
 	taskID := uuid.New().String()
-	fileName := CleanFilename(req.Filename)
+	fileName := req.Filename
 	if filepath.Ext(fileName) != ".json" {
 		err = fmt.Errorf("目前仅支持config备份恢复")
 		resp.Code = 400
