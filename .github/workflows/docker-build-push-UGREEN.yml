@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - UGREEN-DEV
+      - latest-dev
 
 jobs:
   build-frontend:

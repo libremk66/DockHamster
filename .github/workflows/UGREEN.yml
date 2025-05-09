@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - UGREEN
+      - latest
     paths:
       - ugreen_version
 
