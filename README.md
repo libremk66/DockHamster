@@ -44,6 +44,3 @@ services:
 
 go版本：1.21+
 
-# 赞助商
-
-![UGREEN](./assets/UGREEN.png)
