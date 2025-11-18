@@ -13,7 +13,7 @@ jobs:
       - name: Checkout frontend code
         uses: actions/checkout@v3
         with:
-          repository: dongshull/Docker-Copilot-React
+          repository: onlyLTY/Docker-Copilot-React
           path: './frontend'
           ref: 'master'
 
