@@ -13,9 +13,9 @@ jobs:
       - name: Checkout frontend code
         uses: actions/checkout@v3
         with:
-          repository: onlyLTY/dockerCopilotWeb
+          repository: dongshull/Docker-Copilot-React
           path: './frontend'
-          ref: 'main'
+          ref: 'master'
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
