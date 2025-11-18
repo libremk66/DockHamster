@@ -112,6 +112,8 @@ func RegisterHandlers(engine *rest.Server) {
 
 	frontFileServer := http.StripPrefix("/manager", http.FileServer(http.FS(frontFS)))
 
+	assetsHandler := http.FileServer(http.FS(frontFS))
+
 	engine.AddRoutes(
 		[]rest.Route{
 			{
@@ -139,7 +141,7 @@ func RegisterHandlers(engine *rest.Server) {
 				Method: http.MethodGet,
 				Path:   "/assets/:path",
 				Handler: func(w http.ResponseWriter, r *http.Request) {
-					frontFileServer.ServeHTTP(w, r)
+					assetsHandler.ServeHTTP(w, r)
 				},
 			},
 		},
