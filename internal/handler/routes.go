@@ -106,12 +106,12 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			{
 				Method:  http.MethodGet,
 				Path:    "/",
-				Handler: icons.UploadHandler(serverCtx),
+				Handler: icons.ObtainHandler(serverCtx),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/",
-				Handler: icons.ObtainHandler(serverCtx),
+				Handler: icons.UploadHandler(serverCtx),
 			},
 		},
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
