@@ -2,6 +2,7 @@ package version
 
 import (
 	"context"
+
 	"github.com/onlyLTY/dockerCopilot/internal/config"
 
 	"github.com/onlyLTY/dockerCopilot/internal/svc"
@@ -37,7 +38,7 @@ func (l *VersionLogic) Version(req *types.VersionReq) (resp *types.Resp, err err
 	} else if req.Type == "remote" {
 		remoteVersion, err := utiles.GetRemoteVersion()
 		if err != nil {
-			resp.Code = 500
+			resp.Code = 50001
 			resp.Msg = "获取版本错误" + err.Error()
 			resp.Data = map[string]string{
 				"remoteVersion": config.Version,

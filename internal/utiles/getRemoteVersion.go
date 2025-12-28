@@ -1,12 +1,13 @@
 package utiles
 
 import (
-	"github.com/onlyLTY/dockerCopilot/internal/config"
-	"github.com/zeromicro/go-zero/core/logx"
 	"io"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/onlyLTY/dockerCopilot/internal/config"
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 func GetRemoteVersion() (remoteVersion string, err error) {
@@ -36,7 +37,13 @@ func GetRemoteVersion() (remoteVersion string, err error) {
 }
 
 func fetchVersionFromURL(url string) (string, error) {
-	resp, err := http.Get(url)
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+		},
+	}
+
+	resp, err := client.Get(url)
 	if err != nil {
 		return "", err
 	}
