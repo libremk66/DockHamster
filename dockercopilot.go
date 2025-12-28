@@ -4,6 +4,12 @@ import (
 	"embed"
 	"flag"
 	"fmt"
+	"go/types"
+	"io/fs"
+	"log"
+	"net/http"
+	"os"
+
 	"github.com/onlyLTY/dockerCopilot/internal/config"
 	"github.com/onlyLTY/dockerCopilot/internal/handler"
 	"github.com/onlyLTY/dockerCopilot/internal/svc"
@@ -15,11 +21,6 @@ import (
 	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/zeromicro/x/errors"
 	xhttp "github.com/zeromicro/x/http"
-	"go/types"
-	"io/fs"
-	"log"
-	"net/http"
-	"os"
 )
 
 //go:embed front/*
@@ -61,6 +62,24 @@ func main() {
 		}))
 	defer server.Stop()
 	ctx := svc.NewServiceContext(c)
+
+	// Ensure data directory and config exist (Auto-init)
+	dataDir := "/data/config/image"
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		logx.Errorf("Failed to create data directory: %v", err)
+	}
+
+	imageLogosPath := "/data/config/imageLogos.js"
+	if _, err := os.Stat(imageLogosPath); os.IsNotExist(err) {
+		defaultConfig := []byte(`// 自定义镜像logo配置
+export const customImageLogos = {
+};
+`)
+		if err := os.WriteFile(imageLogosPath, defaultConfig, 0644); err != nil {
+			logx.Errorf("Failed to create default imageLogos.js: %v", err)
+		}
+	}
+
 	list, err := utiles.GetImagesList(ctx)
 	if err != nil {
 		logx.Errorf("panic获取镜像列表出错: %v", err)
@@ -113,6 +132,20 @@ func RegisterHandlers(engine *rest.Server) {
 	frontFileServer := http.StripPrefix("/manager", http.FileServer(http.FS(frontFS)))
 
 	assetsHandler := http.FileServer(http.FS(frontFS))
+
+	// Serve custom icons
+	iconFileServer := http.StripPrefix("/src/config/image/", http.FileServer(http.Dir("/data/config/image")))
+	engine.AddRoutes(
+		[]rest.Route{
+			{
+				Method: http.MethodGet,
+				Path:   "/src/config/image/:file",
+				Handler: func(w http.ResponseWriter, r *http.Request) {
+					iconFileServer.ServeHTTP(w, r)
+				},
+			},
+		},
+	)
 
 	engine.AddRoutes(
 		[]rest.Route{

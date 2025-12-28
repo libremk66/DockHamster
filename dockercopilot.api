@@ -180,3 +180,16 @@ service dockerCopilot {
 		put /program returns (Resp)
 }
 
+@server(
+	prefix: /api/icons
+	group: icons
+	jwt: Auth
+)
+service dockerCopilot {
+	@handler upload
+	get / returns (Resp)
+
+	@handler obtain
+	post / (RemoveImageReq) returns (Resp)
+}
+
