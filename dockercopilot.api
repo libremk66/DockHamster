@@ -190,6 +190,6 @@ service dockerCopilot {
 	get / returns (Resp)
 
 	@handler obtain
-	post / (RemoveImageReq) returns (Resp)
+		post / returns (Resp)
 }
 
