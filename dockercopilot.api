@@ -187,9 +187,9 @@ service dockerCopilot {
 )
 service dockerCopilot {
 	@handler upload
-	get / returns (Resp)
+		post / returns (Resp)
 
 	@handler obtain
-		post / returns (Resp)
+	get / returns (Resp)
 }
 
