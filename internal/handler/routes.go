@@ -104,12 +104,12 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
 		[]rest.Route{
 			{
-				Method:  http.MethodGet,
+				Method:  http.MethodPost,
 				Path:    "/",
-				Handler: icons.ObtainHandler(serverCtx),
+				Handler: icons.UploadHandler(serverCtx),
 			},
 			{
-				Method:  http.MethodPost,
+				Method:  http.MethodGet,
 				Path:    "/",
 				Handler: icons.UploadHandler(serverCtx),
 			},
