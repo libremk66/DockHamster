@@ -1,4 +1,4 @@
-package handler
+package icons
 
 import (
 	"fmt"
@@ -10,16 +10,11 @@ import (
 	"strings"
 
 	"github.com/onlyLTY/dockerCopilot/internal/svc"
+	"github.com/onlyLTY/dockerCopilot/internal/types"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-type IconUploadResponse struct {
-	Code int    `json:"code"`
-	Msg  string `json:"msg"`
-	Data string `json:"data"`
-}
-
-func UploadIconHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+func UploadHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// 1. 解析 Multipart 表单
 		err := r.ParseMultipartForm(10 << 20) // 10MB 限制
@@ -84,7 +79,7 @@ func UploadIconHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 
-		httpx.OkJsonCtx(r.Context(), w, IconUploadResponse{
+		httpx.OkJsonCtx(r.Context(), w, types.Resp{
 			Code: 200,
 			Msg:  "Success",
 			Data: filename,
@@ -127,59 +122,4 @@ func updateImageLogosJS(filePath, imageName, filename string) error {
 	}
 
 	return os.WriteFile(filePath, []byte(content), 0644)
-}
-
-func ListIconsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		jsPath := "/data/config/imageLogos.js"
-		fmt.Printf("Reading icons from: %s\n", jsPath)
-
-		contentBytes, err := os.ReadFile(jsPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				fmt.Println("Config file does not exist, returning empty.")
-				httpx.OkJsonCtx(r.Context(), w, IconUploadResponse{
-					Code: 200,
-					Msg:  "Success",
-					Data: "{}",
-				})
-				return
-			}
-			fmt.Printf("Error reading config: %v\n", err)
-			httpx.ErrorCtx(r.Context(), w, fmt.Errorf("failed to read config: %v", err))
-			return
-		}
-
-		content := string(contentBytes)
-		// fmt.Printf("Config content: %s\n", content) // Uncomment for deep debug
-
-		// 改进的正则表达式：匹配 "key": "value"，允许一定的格式变化
-		// 使用反引号表示原始字符串。
-		re := regexp.MustCompile(`"([^"]+)"\s*:\s*"([^"]+)"`)
-		matches := re.FindAllStringSubmatch(content, -1)
-
-		icons := make(map[string]string)
-		for _, match := range matches {
-			if len(match) == 3 {
-				key := match[1]
-				val := match[2]
-				icons[key] = val
-				// fmt.Printf("Found icon: %s -> %s\n", key, val)
-			}
-		}
-
-		fmt.Printf("Total icons found: %d\n", len(icons))
-
-		response := struct {
-			Code int               `json:"code"`
-			Msg  string            `json:"msg"`
-			Data map[string]string `json:"data"`
-		}{
-			Code: 200,
-			Msg:  "Success",
-			Data: icons,
-		}
-
-		httpx.OkJsonCtx(r.Context(), w, response)
-	}
 }

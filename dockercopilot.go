@@ -118,12 +118,12 @@ export const customImageLogos = {
 		}
 	})
 	handler.RegisterHandlers(server, ctx)
-	RegisterHandlers(server, ctx)
+	RegisterHandlers(server)
 	fmt.Printf("Starting server at %s:%d...\n", c.Host, c.Port)
 	logx.Info("程序版本" + config.Version)
 	server.Start()
 }
-func RegisterHandlers(engine *rest.Server, ctx *svc.ServiceContext) {
+func RegisterHandlers(engine *rest.Server) {
 	frontFS, err := fs.Sub(embeddedFront, "front")
 	if err != nil {
 		log.Fatal(err)
@@ -132,22 +132,6 @@ func RegisterHandlers(engine *rest.Server, ctx *svc.ServiceContext) {
 	frontFileServer := http.StripPrefix("/manager", http.FileServer(http.FS(frontFS)))
 
 	assetsHandler := http.FileServer(http.FS(frontFS))
-
-	engine.AddRoutes(
-		[]rest.Route{
-			{
-				Method:  http.MethodPost,
-				Path:    "/icons",
-				Handler: handler.UploadIconHandler(ctx),
-			},
-			{
-				Method:  http.MethodGet,
-				Path:    "/icons",
-				Handler: handler.ListIconsHandler(ctx),
-			},
-		},
-		rest.WithPrefix("/api"),
-	)
 
 	// Serve custom icons
 	iconFileServer := http.StripPrefix("/src/config/image/", http.FileServer(http.Dir("/data/config/image")))
