@@ -8,18 +8,19 @@ import (
 
 	"github.com/onlyLTY/dockerCopilot/internal/svc"
 	"github.com/onlyLTY/dockerCopilot/internal/types"
+	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 func ObtainHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jsPath := "/data/config/imageLogos.js"
-		fmt.Printf("Reading icons from: %s\n", jsPath)
+		logx.Infof("Reading icons from: %s", jsPath)
 
 		contentBytes, err := os.ReadFile(jsPath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				fmt.Println("Config file does not exist, returning empty.")
+				logx.Info("Config file does not exist, returning empty.")
 				httpx.OkJsonCtx(r.Context(), w, types.Resp{
 					Code: 200,
 					Msg:  "Success",
@@ -27,7 +28,7 @@ func ObtainHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 				})
 				return
 			}
-			fmt.Printf("Error reading config: %v\n", err)
+			logx.Errorf("Error reading config: %v", err)
 			httpx.ErrorCtx(r.Context(), w, fmt.Errorf("failed to read config: %v", err))
 			return
 		}
@@ -50,7 +51,7 @@ func ObtainHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			}
 		}
 
-		fmt.Printf("Total icons found: %d\n", len(icons))
+		logx.Infof("Total icons found: %d", len(icons))
 
 		response := struct {
 			Code int               `json:"code"`
