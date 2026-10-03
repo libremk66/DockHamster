@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/onlyLTY/dockerCopilot/internal/config"
+	"github.com/libremk66/DockHamster/internal/config"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -15,7 +15,7 @@ func GetRemoteVersion() (remoteVersion string, err error) {
 	if githubProxy != "" {
 		githubProxy = strings.TrimRight(githubProxy, "/") + "/"
 	}
-	versionURL := githubProxy + "https://raw.githubusercontent.com/onlyLTY/dockerCopilot/UGREEN/version"
+	versionURL := githubProxy + "https://raw.githubusercontent.com/libremk66/DockHamster/main/version"
 	remoteVersion, err = fetchVersionFromURL(versionURL)
 	if err != nil {
 		return "0.0.0", err

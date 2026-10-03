@@ -4,10 +4,10 @@ import (
 	"context"
 	"strings"
 
-	"github.com/onlyLTY/dockerCopilot/internal/module"
-	"github.com/onlyLTY/dockerCopilot/internal/svc"
-	"github.com/onlyLTY/dockerCopilot/internal/types"
-	"github.com/onlyLTY/dockerCopilot/internal/utiles"
+	"github.com/libremk66/DockHamster/internal/module"
+	"github.com/libremk66/DockHamster/internal/svc"
+	"github.com/libremk66/DockHamster/internal/types"
+	"github.com/libremk66/DockHamster/internal/utiles"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -123,7 +123,7 @@ func (l *AutoUpdateLogic) TestNotify(channel string, draft *module.NotifyChannel
 	if draft != nil {
 		cfg = *draft
 	}
-	res := module.SendChannel(channel, cfg, "🔔 DockerCopilot 通知测试", "如果你看到这条消息，说明该渠道配置成功 ✅")
+	res := module.SendChannel(channel, cfg, "🔔 DockHamster 通知测试", "如果你看到这条消息，说明该渠道配置成功 ✅")
 	if !res.OK {
 		resp.Code = 500
 		resp.Msg = "发送失败：" + res.Error

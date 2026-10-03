@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/docker/docker/api/types/image"
-	"github.com/onlyLTY/dockerCopilot/internal/svc"
-	MyType "github.com/onlyLTY/dockerCopilot/internal/types"
+	"github.com/libremk66/DockHamster/internal/svc"
+	MyType "github.com/libremk66/DockHamster/internal/types"
 	"log"
 	"strings"
 )

@@ -8,8 +8,8 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/google/uuid"
-	"github.com/onlyLTY/dockerCopilot/internal/module"
-	"github.com/onlyLTY/dockerCopilot/internal/svc"
+	"github.com/libremk66/DockHamster/internal/module"
+	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/zeromicro/go-zero/core/logx"
 	"os"
 )

@@ -1,9 +1,9 @@
-# 定制功能说明（custom 分支）
+# DockHamster 功能说明
 
-> 本分支 = 官方 [onlyLTY/dockerCopilot](https://github.com/onlyLTY/dockerCopilot)（`latest`）**+ 以下增强**。
-> `latest` 分支永远保持与官方一致；所有定制都集中在 `custom` 分支，便于持续跟随上游。
+> DockHamster（容器仓鼠）基于 [onlyLTY/dockerCopilot](https://github.com/onlyLTY/dockerCopilot)（AGPL-3.0）二次开发，
+> 在原项目基础上叠加以下增强；不带增强配置时行为与原项目一致（纯手动模式）。
 >
-> 配套前端：[libremk66/Docker-Copilot-React](https://github.com/libremk66/Docker-Copilot-React)（`custom` 分支）。
+> 配套前端：[libremk66/DockHamster-UI](https://github.com/libremk66/DockHamster-UI)。
 
 ## 一、功能总览
 
@@ -120,27 +120,21 @@ internal/logic/container/*.go      修改：手动更新接入设置；容器列
 internal/types/types.go / svc / dockercopilot.go  小改
 ```
 
-前端（[libremk66/Docker-Copilot-React](https://github.com/libremk66/Docker-Copilot-React) `custom` 分支）：
+前端（[libremk66/DockHamster-UI](https://github.com/libremk66/DockHamster-UI)）：
 `src/components/AutoUpdate.jsx`（新增页面）、`Containers.jsx`（列表化/搜索/开关/整组弹窗/进度子行）、`Images.jsx`（列表化/搜索）、`ProgressBar.jsx`、`Header.jsx`、`App.jsx`、`api/client.js`。
 
-## 五、跟随官方更新
+## 五、与上游的关系
 
-```bash
-# 后端
-git fetch upstream latest && git rebase upstream/latest && git push origin custom
+本项目为独立维护的社区增强版：**不再自动 rebase 上游**，但保留了完整的 git 历史与出处标注（AGPL 要求）；上游修复会按需 cherry-pick。
 
-# 前端（另一仓库，上游为 dongshull/Docker-Copilot-React 的 master）
-git fetch upstream master && git rebase upstream/master && git push origin custom
-```
-
-通用修复建议持续向上游提 PR；一旦合并，对应文件就无需再维护。
+通用修复建议持续向上游提 PR；一旦合并，对应实现即可与上游对齐。
 
 ## 六、构建与发布
 
-- 推送 `custom` 分支 → GitHub Actions（`custom-build.yml`）自动构建 amd64/arm64 并推送：
-  `libremk66/dockercopilotme:latest`（同时打 `:vX.Y.Z` 版本 tag）
+- 推送 `main` 分支 → GitHub Actions（`build.yml`）自动构建 amd64/arm64 并推送：
+  `libremk66/dockhamster:latest`（同时打 `:vX.Y.Z` 版本 tag）
 - 需要仓库 Secrets：`DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`
 
 ## 七、许可
 
-遵循 **AGPL-3.0**（与上游一致）。完整源码即本仓库（`custom` 分支），AGPL §13 合规。
+遵循 **AGPL-3.0**（与上游一致）。完整源码即本仓库（`main` 分支），AGPL §13 合规。版权归属：上游原作者 + 本项目贡献者。

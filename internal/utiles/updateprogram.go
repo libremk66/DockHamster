@@ -4,7 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"fmt"
-	"github.com/onlyLTY/dockerCopilot/internal/svc"
+	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/zeromicro/go-zero/core/logx"
 	"io"
 	"net/http"
@@ -18,8 +18,8 @@ func UpdateProgram(ctx *svc.ServiceContext) error {
 	if githubProxy != "" {
 		githubProxy = strings.TrimRight(githubProxy, "/") + "/"
 	}
-	versionURL := githubProxy + "https://raw.githubusercontent.com/onlyLTY/dockerCopilot/UGREEN/version"
-	releaseBaseURL := githubProxy + "https://github.com/onlyLTY/dockerCopilot/releases/download"
+	versionURL := githubProxy + "https://raw.githubusercontent.com/libremk66/DockHamster/main/version"
+	releaseBaseURL := githubProxy + "https://github.com/libremk66/DockHamster/releases/download"
 	logx.Infof("versionURL: %s", versionURL)
 	resp, err := http.Get(versionURL)
 	if err != nil {
@@ -43,9 +43,9 @@ func UpdateProgram(ctx *svc.ServiceContext) error {
 	version := strings.TrimSpace(string(versionData))
 	logx.Info("获取到最新版本：", version)
 	// 2. 构造下载链接
-	downloadURL := fmt.Sprintf("%s/%s/dockerCopilot-%s.tar.gz", releaseBaseURL, version, runtime.GOARCH)
+	downloadURL := fmt.Sprintf("%s/%s/dockhamster-%s.tar.gz", releaseBaseURL, version, runtime.GOARCH)
 	logx.Info("下载链接：", downloadURL)
-	dest := "dockerCopilot.tar.gz"
+	dest := "dockhamster.tar.gz"
 
 	if err := downloadFile(downloadURL, dest); err != nil {
 		logx.Error("下载失败:", err)

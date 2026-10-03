@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	ref "github.com/distribution/reference"
-	"github.com/onlyLTY/dockerCopilot/internal/types"
+	"github.com/libremk66/DockHamster/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 	"io"
 	"net"
@@ -65,7 +65,7 @@ func (i *ImageUpdateData) CheckUpdate(imageList []types.Image) {
 	i.mu.RUnlock()
 
 	for _, image := range imageList {
-		if strings.Contains(image.ImageName, "0nlylty/dockercopilot") {
+		if strings.Contains(image.ImageName, "libremk66/dockhamster") {
 			continue
 		}
 		if result := i.checkSingleImage(image); result != nil {

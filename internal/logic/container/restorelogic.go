@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/onlyLTY/dockerCopilot/internal/utiles"
+	"github.com/libremk66/DockHamster/internal/utiles"
 	"path/filepath"
 
-	"github.com/onlyLTY/dockerCopilot/internal/svc"
-	"github.com/onlyLTY/dockerCopilot/internal/types"
+	"github.com/libremk66/DockHamster/internal/svc"
+	"github.com/libremk66/DockHamster/internal/types"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
