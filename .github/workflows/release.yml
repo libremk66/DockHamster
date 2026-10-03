@@ -1,7 +1,7 @@
 name: release
 
-# version 文件变化 → 自动打 tag + 建 Release（含自动变更日志）
-# 与 build.yml 配套：同一个 version 文件同时驱动"镜像构建"和"GitHub Release"，三处版本号永远一致
+# version 文件变化 → 自动打 tag + 建 Release（含自动生成的变更日志）
+# 与 build.yml 配套：同一个 version 文件同时驱动"镜像构建"和本发布流程，三处版本号永远一致
 on:
   push:
     branches:
@@ -30,23 +30,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -eu
           V="${{ steps.v.outputs.version }}"
           if gh release view "$V" >/dev/null 2>&1; then
             echo "Release $V 已存在，跳过"
             exit 0
           fi
-          gh release create "$V" \
-            --title "$V" \
-            --generate-notes \
-            --notes "🐹 **DockHamster 容器仓鼠 $V**
-
-**Docker 镜像**：\`libremk66/dockhamster:$V\`（\`latest\` 同步更新，多架构 amd64/arm64）
-
-**怎么更新**
-- 面板内：容器页 → 找到 \`dockhamster\` 容器 → 点「更新」（自动拉新镜像重建，配置数据保留）
-- 命令行：\`docker compose pull && docker compose up -d\`
-
----
-
-## 本次变更
-"
+          {
+            echo "🐹 **DockHamster 容器仓鼠 $V**"
+            echo ""
+            echo "**Docker 镜像**：\`libremk66/dockhamster:$V\`（\`latest\` 同步更新，多架构 amd64/arm64）"
+            echo ""
+            echo "**怎么更新**"
+            echo ""
+            echo "- 面板内：容器页 → 找到 \`dockhamster\` 容器 → 点「更新」（自动拉新镜像重建，配置数据保留）"
+            echo "- 命令行：\`docker compose pull && docker compose up -d\`"
+            echo ""
+            echo "---"
+            echo ""
+            echo "## 本次变更"
+          } > /tmp/notes.md
+          gh release create "$V" --title "$V" --generate-notes --notes-file /tmp/notes.md
+          echo "已创建 Release $V"
