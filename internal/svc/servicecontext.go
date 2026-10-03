@@ -4,6 +4,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/onlyLTY/dockerCopilot/internal/config"
 	"github.com/onlyLTY/dockerCopilot/internal/module"
+	"github.com/robfig/cron/v3"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest"
 	"sync"
@@ -20,7 +21,13 @@ type ServiceContext struct {
 	IndexCheckMiddleware       rest.Middleware
 	ProgressStore              ProgressStoreType
 	DockerClient               *client.Client
-	mu                         sync.Mutex
+	// 自动更新（UI 配）
+	AutoUpdate       *module.AutoUpdateStore
+	AutoUpdateState  *module.AutoUpdateState
+	CronEngine       *cron.Cron
+	AutoUpdateCronID cron.EntryID
+	CronMu           sync.Mutex
+	mu               sync.Mutex
 }
 
 type TaskProgress struct {
@@ -40,10 +47,12 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		logx.Errorf("Unable to create docker client: %s", err)
 	}
 	return &ServiceContext{
-		Config:        c,
-		HubImageInfo:  module.NewImageCheck(),
-		ProgressStore: make(ProgressStoreType),
-		DockerClient:  cli,
+		Config:          c,
+		HubImageInfo:    module.NewImageCheck(),
+		ProgressStore:   make(ProgressStoreType),
+		DockerClient:    cli,
+		AutoUpdate:      module.NewAutoUpdateStore(),
+		AutoUpdateState: module.NewAutoUpdateState(),
 	}
 }
 

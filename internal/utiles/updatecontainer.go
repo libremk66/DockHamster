@@ -14,13 +14,20 @@ import (
 	"time"
 )
 
-func UpdateContainer(serviceContext *svc.ServiceContext, id string, name string, imageNameAndTag string, delOldContainer bool, taskID string) error {
-	return updateContainerCore(serviceContext, id, name, imageNameAndTag, delOldContainer, taskID, false)
+// UpdateOptions 更新行为选项
+type UpdateOptions struct {
+	SkipPull        bool // 跳过拉取（批量更新中同一镜像已由调用方统一拉取）
+	DelOldContainer bool // 更新完成后删除旧容器（false=保留改名后的旧容器）
+	DeleteOldImage  bool // 更新完成后安全清理旧镜像（三重条件保护，见 CleanupOldImage）
 }
 
-// updateContainerCore 更新容器。
-// skipPull=true 时跳过拉取（批量更新中同一镜像已由调用方统一拉取，避免重复拉取）。
-func updateContainerCore(serviceContext *svc.ServiceContext, id string, name string, imageNameAndTag string, delOldContainer bool, taskID string, skipPull bool) error {
+func UpdateContainer(serviceContext *svc.ServiceContext, id string, name string, imageNameAndTag string, opts UpdateOptions, taskID string) error {
+	_, err := updateContainerCore(serviceContext, id, name, imageNameAndTag, opts, taskID)
+	return err
+}
+
+// updateContainerCore 更新容器；返回旧镜像是否被清理。
+func updateContainerCore(serviceContext *svc.ServiceContext, id string, name string, imageNameAndTag string, opts UpdateOptions, taskID string) (bool, error) {
 	ctx := context.Background()
 	serviceContext.UpdateProgress(taskID, svc.TaskProgress{
 		TaskID:     taskID,
@@ -45,7 +52,8 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
 	serviceContext.DockerClient.NegotiateAPIVersion(ctx)
-	if !skipPull {
+
+	if !opts.SkipPull {
 		oldTaskProgress.Message = "正在拉取新镜像"
 		oldTaskProgress.Percentage = 10
 		oldTaskProgress.DetailMsg = "正在拉取新镜像"
@@ -57,7 +65,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 			oldTaskProgress.IsDone = true
 			serviceContext.UpdateProgress(taskID, oldTaskProgress)
 			logx.Errorf("Failed to pull image: %s", err)
-			return err
+			return false, err
 		}
 		err = decodePullResp(reader, serviceContext, taskID)
 		if err != nil {
@@ -66,7 +74,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 			oldTaskProgress.IsDone = true
 			serviceContext.UpdateProgress(taskID, oldTaskProgress)
 			logx.Errorf("Failed to pull image: %s", err)
-			return err
+			return false, err
 		}
 	}
 	oldTaskProgress, result = serviceContext.GetProgress(taskID)
@@ -79,8 +87,26 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 			IsDone:     false,
 		}
 	}
-	oldTaskProgress.Message = "拉取镜像成功"
-	oldTaskProgress.DetailMsg = "拉取镜像成功"
+	if opts.SkipPull {
+		oldTaskProgress.Message = "跳过拉取（同镜像已统一下载）"
+		oldTaskProgress.DetailMsg = "跳过拉取（同镜像已统一下载）"
+	} else {
+		oldTaskProgress.Message = "拉取镜像成功"
+		oldTaskProgress.DetailMsg = "拉取镜像成功"
+	}
+
+	// 停止前先取一次容器信息：保留原始配置、镜像 ID 与运行状态
+	inspectedContainer, err := serviceContext.DockerClient.ContainerInspect(ctx, id)
+	if err != nil {
+		oldTaskProgress.Message = "获取容器信息失败"
+		oldTaskProgress.DetailMsg = err.Error()
+		oldTaskProgress.IsDone = true
+		serviceContext.UpdateProgress(taskID, oldTaskProgress)
+		logx.Error("获取容器信息失败" + err.Error())
+		return false, err
+	}
+	oldImageID := inspectedContainer.Image
+	wasRunning := inspectedContainer.State != nil && inspectedContainer.State.Running
 
 	oldTaskProgress.Percentage = 30
 	oldTaskProgress.Message = "正在停止容器"
@@ -90,13 +116,13 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 		Signal:  signal,
 		Timeout: &timeout,
 	}
-	err := serviceContext.DockerClient.ContainerStop(context.Background(), id, stopOptions)
+	err = serviceContext.DockerClient.ContainerStop(context.Background(), id, stopOptions)
 	if err != nil {
 		oldTaskProgress.Message = "停止容器失败"
 		oldTaskProgress.DetailMsg = err.Error()
 		oldTaskProgress.IsDone = true
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
-		return err
+		return false, err
 	}
 	oldTaskProgress.Message = "容器停止成功"
 	oldTaskProgress.DetailMsg = "容器停止成功"
@@ -113,7 +139,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 		oldTaskProgress.DetailMsg = err.Error()
 		oldTaskProgress.IsDone = true
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
-		return err
+		return false, err
 	}
 	oldTaskProgress.Message = "重命名旧容器成功"
 	oldTaskProgress.DetailMsg = "重命名旧容器成功"
@@ -122,17 +148,6 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	oldTaskProgress.Message = "正在创建新容器"
 	oldTaskProgress.DetailMsg = "正在创建新容器"
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
-	inspectedContainer, err := serviceContext.DockerClient.ContainerInspect(ctx, id)
-	if err != nil {
-		oldTaskProgress.Message = "获取容器信息失败"
-		oldTaskProgress.DetailMsg = err.Error()
-		oldTaskProgress.IsDone = true
-		serviceContext.UpdateProgress(taskID, oldTaskProgress)
-		logx.Error("获取容器信息失败" + err.Error())
-		return err
-	}
-	// 记录旧镜像 ID（ContainerJSON.Image 即镜像 ID）：更新完成后据此安全清理
-	oldImageID := inspectedContainer.Image
 	inspectedContainer.Config.Hostname = ""
 	inspectedContainer.Config.Image = imageNameAndTag
 	inspectedContainer.Image = imageNameAndTag
@@ -148,54 +163,65 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 		oldTaskProgress.DetailMsg = err.Error()
 		oldTaskProgress.IsDone = true
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
-		return err
+		return false, err
 	}
 	oldTaskProgress.Message = "创建新容器成功"
 	oldTaskProgress.DetailMsg = "创建新容器成功"
 	oldTaskProgress.Percentage = 80
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
-	oldTaskProgress.Message = "正在启动新容器以及删除旧容器(如果不保留旧容器)"
-	oldTaskProgress.DetailMsg = "正在启动新容器以及删除旧容器(如果不保留旧容器)"
-	serviceContext.UpdateProgress(taskID, oldTaskProgress)
-	err = serviceContext.DockerClient.ContainerStart(context.Background(), containerName, container.StartOptions{
-		CheckpointID:  "",
-		CheckpointDir: "",
-	})
-	if err != nil {
-		oldTaskProgress.Message = "启动新容器失败"
-		oldTaskProgress.DetailMsg = err.Error()
-		oldTaskProgress.IsDone = true
+	if wasRunning {
+		oldTaskProgress.Message = "正在启动新容器以及删除旧容器(如果不保留旧容器)"
+		oldTaskProgress.DetailMsg = "正在启动新容器以及删除旧容器(如果不保留旧容器)"
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
-		return err
+		err = serviceContext.DockerClient.ContainerStart(context.Background(), containerName, container.StartOptions{
+			CheckpointID:  "",
+			CheckpointDir: "",
+		})
+		if err != nil {
+			oldTaskProgress.Message = "启动新容器失败"
+			oldTaskProgress.DetailMsg = err.Error()
+			oldTaskProgress.IsDone = true
+			serviceContext.UpdateProgress(taskID, oldTaskProgress)
+			return false, err
+		}
+	} else {
+		oldTaskProgress.Message = "容器原为停止状态，保持停止"
+		oldTaskProgress.DetailMsg = "容器原为停止状态，保持停止"
+		serviceContext.UpdateProgress(taskID, oldTaskProgress)
 	}
-	if delOldContainer {
+	if opts.DelOldContainer {
 		err = serviceContext.DockerClient.ContainerRemove(context.Background(), id, container.RemoveOptions{})
 		if err != nil {
 			oldTaskProgress.Message = "删除旧容器失败"
 			oldTaskProgress.DetailMsg = err.Error()
 			oldTaskProgress.IsDone = true
 			serviceContext.UpdateProgress(taskID, oldTaskProgress)
-			return err
+			return false, err
 		}
 	}
-	// 安全清理旧镜像（不满足条件则跳过；失败不影响更新结果）
-	newImageID := ""
-	if newInspected, ierr := serviceContext.DockerClient.ContainerInspect(ctx, containerName); ierr == nil {
-		newImageID = newInspected.Image
-	}
-	oldTaskProgress.Message = "正在清理旧镜像"
-	oldTaskProgress.DetailMsg = "正在清理旧镜像"
-	oldTaskProgress.Percentage = 90
-	serviceContext.UpdateProgress(taskID, oldTaskProgress)
-	if err := CleanupOldImage(serviceContext, oldImageID, newImageID); err != nil {
-		logx.Errorf("清理旧镜像失败(不影响更新): %v", err)
+	// 安全清理旧镜像（三重条件保护；失败不影响更新结果）
+	cleaned := false
+	if opts.DeleteOldImage {
+		newImageID := ""
+		if newInspected, ierr := serviceContext.DockerClient.ContainerInspect(ctx, containerName); ierr == nil {
+			newImageID = newInspected.Image
+		}
+		oldTaskProgress.Message = "正在清理旧镜像"
+		oldTaskProgress.DetailMsg = "正在清理旧镜像"
+		oldTaskProgress.Percentage = 90
+		serviceContext.UpdateProgress(taskID, oldTaskProgress)
+		c, cerr := CleanupOldImage(serviceContext, oldImageID, newImageID, true)
+		if cerr != nil {
+			logx.Errorf("清理旧镜像失败(不影响更新): %v", cerr)
+		}
+		cleaned = c
 	}
 	oldTaskProgress.Message = "更新成功"
 	oldTaskProgress.DetailMsg = "更新成功"
 	oldTaskProgress.Percentage = 100
 	oldTaskProgress.IsDone = true
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
-	return nil
+	return cleaned, nil
 }
 
 // PullImageByRef 仅负责拉取镜像并消费进度流（批量更新时同一镜像只拉一次）
