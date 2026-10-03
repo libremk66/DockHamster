@@ -21,6 +21,7 @@ type Info struct {
 	Id          string `json:"id"`
 	Status      string `json:"status"`
 	Name        string `json:"name"`
+	ImageID     string `json:"imageId"`
 	UsingImage  string `json:"usingImage"`
 	CreateImage string `json:"createImage"`
 	CreateTime  string `json:"createTime"`
@@ -52,6 +53,7 @@ func (l *ContainersListLogic) ContainersList() (resp *types.Resp, err error) {
 	for _, v := range list {
 		var containerInfo Info
 		containerInfo.Id = v.ID
+		containerInfo.ImageID = v.ImageID
 		containerInfo.Status = v.State
 		if len(v.Names) > 0 {
 			ContainerName := v.Names[0][1:]

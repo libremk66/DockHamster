@@ -43,6 +43,14 @@ type getNewImageReq {
 	ImageNameAndTag string `json:"image_name_and_tag"`
 }
 
+type GroupUpdateReq {
+	IdReq
+}
+
+type TestNotifyReq {
+	Webhook string `json:"webhook,optional"`
+}
+
 type MsgResp {
 	Status string `json:"status"`
 	Msg    string `json:"msg"`
@@ -192,4 +200,29 @@ service dockerCopilot {
 
 	@handler obtain
 	get / returns (Resp)
+}
+
+@server(
+	prefix: /api
+	group: autoupdate
+	jwt: Auth
+)
+service dockerCopilot {
+	@handler getSettings
+	get /autoUpdate/settings returns (Resp)
+
+	@handler saveSettings
+	post /autoUpdate/settings returns (Resp)
+
+	@handler run
+	post /autoUpdate/run returns (Resp)
+
+	@handler status
+	get /autoUpdate/status returns (Resp)
+
+	@handler testNotify
+	post /autoUpdate/testNotify (TestNotifyReq) returns (Resp)
+
+	@handler groupUpdate
+	post /container/:id/updateGroup (GroupUpdateReq) returns (Resp)
 }

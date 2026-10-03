@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	auth "github.com/onlyLTY/dockerCopilot/internal/handler/auth"
+	autoupdate "github.com/onlyLTY/dockerCopilot/internal/handler/autoupdate"
 	container "github.com/onlyLTY/dockerCopilot/internal/handler/container"
 	icons "github.com/onlyLTY/dockerCopilot/internal/handler/icons"
 	image "github.com/onlyLTY/dockerCopilot/internal/handler/image"
@@ -141,6 +142,43 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Method:  http.MethodGet,
 				Path:    "/progress/:taskid",
 				Handler: progress.GetProgressHandler(serverCtx),
+			},
+		},
+		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
+		rest.WithPrefix("/api"),
+	)
+
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				Method:  http.MethodGet,
+				Path:    "/autoUpdate/settings",
+				Handler: autoupdate.GetSettingsHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/autoUpdate/settings",
+				Handler: autoupdate.SaveSettingsHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/autoUpdate/run",
+				Handler: autoupdate.RunHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/autoUpdate/status",
+				Handler: autoupdate.StatusHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/autoUpdate/testNotify",
+				Handler: autoupdate.TestNotifyHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/container/:id/updateGroup",
+				Handler: autoupdate.GroupUpdateHandler(serverCtx),
 			},
 		},
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
