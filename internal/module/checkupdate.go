@@ -1,10 +1,12 @@
 package module
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	ref "github.com/distribution/reference"
+	"github.com/docker/docker/api/types/registry"
 	"github.com/libremk66/DockHamster/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 	"io"
@@ -48,7 +50,15 @@ func (i *ImageUpdateData) setAll(data map[string]ImageCheckList) {
 	i.mu.Unlock()
 }
 
-func (i *ImageUpdateData) CheckUpdate(imageList []types.Image) {
+// DockerInspector 走 Docker 守护进程的通道查询 registry。
+// 为什么优先用它：守护进程运行在宿主机上，用的是**用户为拉镜像配置的那条通道**
+// （代理 / registry-mirrors），与"点更新时实际拉取"完全一致；
+// 而面板容器自己发 HTTP 在国内常常连不上官方 registry，只能退到公共加速站（缓存旧、易限流）。
+type DockerInspector interface {
+	DistributionInspect(ctx context.Context, image, encodedRegistryAuth string) (registry.DistributionInspect, error)
+}
+
+func (i *ImageUpdateData) CheckUpdate(cli DockerInspector, imageList []types.Image) {
 	// 保留本地仍存在的镜像的旧状态（单次查询失败不至于丢状态），
 	// 同时清理已不存在镜像的过期条目（避免"阴魂不散"的更新提示）。
 	i.mu.RLock()
@@ -68,7 +78,7 @@ func (i *ImageUpdateData) CheckUpdate(imageList []types.Image) {
 		if strings.Contains(image.ImageName, "libremk66/dockhamster") {
 			continue
 		}
-		if result := i.checkSingleImage(image); result != nil {
+		if result := i.checkSingleImage(cli, image); result != nil {
 			next[image.ID] = *result
 		}
 	}
@@ -76,21 +86,13 @@ func (i *ImageUpdateData) CheckUpdate(imageList []types.Image) {
 }
 
 // checkSingleImage 返回 nil 表示本次检查失败（保留旧状态，不作判断）
-func (i *ImageUpdateData) checkSingleImage(image types.Image) *ImageCheckList {
-	token, err := GetToken(image, "")
-	if err != nil {
-		logx.Error("获取token失败或者无需获取token，继续尝试检查" + err.Error())
-	}
-	digestURL, err := BuildManifestURL(image)
-	if err != nil {
-		logx.Error("获取digestURL失败" + err.Error())
+func (i *ImageUpdateData) checkSingleImage(cli DockerInspector, image types.Image) *ImageCheckList {
+	remoteDigest, source, err := i.resolveRemoteDigest(cli, image)
+	if err != nil || remoteDigest == "" {
+		logx.Infof("获取远端 digest 失败（%s）: %v", source, err)
 		return nil
 	}
-	remoteDigest, err := GetDigest(digestURL, token)
-	if err != nil {
-		logx.Error("获取digest失败" + err.Error())
-		return nil
-	}
+	logx.Infof("远端 digest 来源: %s（%s:%s）", source, image.ImageName, image.ImageTag)
 	if len(image.RepoDigests) == 0 {
 		logx.Error("未在本地获取到repoDigest" + image.ImageName + ":" + image.ImageTag)
 		return nil
@@ -124,6 +126,40 @@ func (i *ImageUpdateData) checkSingleImage(image types.Image) *ImageCheckList {
 		logx.Info(image.ImageName + ":" + image.ImageTag + " not need update")
 	}
 	return &ImageCheckList{NeedUpdate: needUpdate}
+}
+
+// resolveRemoteDigest 取远端 digest：**优先守护进程通道**，失败回退自建 HTTP（兼容加速站）
+func (i *ImageUpdateData) resolveRemoteDigest(cli DockerInspector, image types.Image) (digest string, source string, err error) {
+	ref := image.ImageName
+	if image.ImageTag != "" {
+		ref = ref + ":" + image.ImageTag
+	}
+	// ① 守护进程通道（与拉取同一条路，拿到的就是实时 digest）
+	if cli != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		defer cancel()
+		dist, derr := cli.DistributionInspect(ctx, ref, "")
+		if derr == nil && dist.Descriptor.Digest != "" {
+			return dist.Descriptor.Digest.String(), "daemon", nil
+		}
+		logx.Infof("守护进程通道查询 %s 失败，回退自建 HTTP：%v", ref, derr)
+	}
+	// ② 回退：自己发 HTTP（token + HEAD；国内会被解析到加速站）
+	token, terr := GetToken(image, "")
+	if terr != nil {
+		logx.Error("获取token失败或者无需获取token，继续尝试检查" + terr.Error())
+	}
+	digestURL, uerr := BuildManifestURL(image)
+	if uerr != nil {
+		logx.Error("获取digestURL失败" + uerr.Error())
+		return "", "http", uerr
+	}
+	d, gerr := GetDigest(digestURL, token)
+	if gerr != nil {
+		logx.Error("获取digest失败" + gerr.Error())
+		return "", "http", gerr
+	}
+	return d, "http", nil
 }
 
 // normalizeRepoName 抹平仓库名常见写法差异（大小写 / docker.io / library 前缀）

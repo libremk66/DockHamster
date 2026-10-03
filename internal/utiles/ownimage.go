@@ -71,21 +71,30 @@ func checkOwnImage(serviceContext *svc.ServiceContext) (needUpdate bool, remoteD
 		return false, "", false // 没用官方镜像（或尚未拉取过 digest）→ 不判断
 	}
 
-	// 远端 digest（走现有 registry 比对逻辑，自动适配 hubURL 镜像站）
+	// 远端 digest：优先走守护进程通道（与拉取同一条路，国内可用），失败回退自建 HTTP
 	img := types.Image{ImageName: ownImageRepo, ImageTag: "latest"}
-	token, terr := module.GetToken(img, "")
-	if terr != nil {
-		logx.Infof("镜像更新双保险：取 token 失败(继续): %v", terr)
-	}
-	digestURL, uerr := module.BuildManifestURL(img)
-	if uerr != nil {
-		logx.Infof("镜像更新双保险：构造 digest 地址失败: %v", uerr)
-		return false, "", false
-	}
-	remoteDigest, derr := module.GetDigest(digestURL, token)
-	if derr != nil || remoteDigest == "" {
-		logx.Infof("镜像更新双保险：取远端 digest 失败: %v", derr)
-		return false, "", false
+	// 注意：remoteDigest 是具名返回值，这里不能再 :=
+	dist, derr := serviceContext.DockerClient.DistributionInspect(ctx, ownImageRepo+":latest", "")
+	if derr == nil && dist.Descriptor.Digest != "" {
+		remoteDigest = dist.Descriptor.Digest.String()
+		logx.Infof("镜像更新双保险：经守护进程取到远端 digest %s", remoteDigest)
+	} else {
+		logx.Infof("镜像更新双保险：守护进程通道失败(%v)，回退 HTTP", derr)
+		token, terr := module.GetToken(img, "")
+		if terr != nil {
+			logx.Infof("镜像更新双保险：取 token 失败(继续): %v", terr)
+		}
+		digestURL, uerr := module.BuildManifestURL(img)
+		if uerr != nil {
+			logx.Infof("镜像更新双保险：构造 digest 地址失败: %v", uerr)
+			return false, "", false
+		}
+		d2, derr2 := module.GetDigest(digestURL, token)
+		if derr2 != nil || d2 == "" {
+			logx.Infof("镜像更新双保险：取远端 digest 失败: %v", derr2)
+			return false, "", false
+		}
+		remoteDigest = d2
 	}
 	for _, ld := range localDigests {
 		if strings.Contains(ld, remoteDigest) {
