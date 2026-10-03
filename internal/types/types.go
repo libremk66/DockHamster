@@ -24,6 +24,22 @@ type CreateContainerReq struct {
 	ImageNameAndTag string `json:"image_name_and_tag"`
 }
 
+// ── 镜像快照 ──────────────────────────────────────────────
+
+type SnapshotCreateReq struct {
+	ContainerName string `json:"containerName,optional"`
+	ImageID       string `json:"imageId,optional"`
+}
+
+type SnapshotRollbackReq struct {
+	ContainerName string `json:"containerName"`
+	Ref           string `json:"ref"`
+}
+
+type SnapshotPruneReq struct {
+	Keep int `json:"keep,optional"`
+}
+
 type DelContainerBackupReq struct {
 	Filename string `form:"filename"`
 }

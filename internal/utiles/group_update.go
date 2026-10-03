@@ -56,10 +56,17 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 	}
 
 	settings := serviceContext.AutoUpdate.Get()
+	// 同一镜像多个容器：策略合并（保留优先 snapshot > keep > clean）
+	policies := make([]string, 0, len(targets))
+	for _, t := range targets {
+		policies = append(policies, settings.ResolveOldImagePolicy(t.name))
+	}
 	opts := UpdateOptions{
 		SkipPull:        true, // 统一拉取
 		DelOldContainer: os.Getenv("DelOldContainer") != "false",
 		DeleteOldImage:  settings.DeleteOldImage,
+		OldImagePolicy:  MergePolicies(policies),
+		SnapshotOptions: SnapshotOptionsFromSettings(settings),
 	}
 	pullRef := resolvePullRef(serviceContext, targetImageID, target.Config.Image)
 
@@ -94,7 +101,7 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 			return
 		}
 		for _, t := range tasks {
-			cleaned, err := updateContainerCore(serviceContext, t.ID, t.Name, pullRef, opts, t.TaskID)
+			outcome, err := updateContainerCore(serviceContext, t.ID, t.Name, pullRef, opts, t.TaskID)
 			if err != nil {
 				logx.Errorf("整组更新：容器 %s 更新失败：%v", t.Name, err)
 				result.Failed = append(result.Failed, module.AutoRunFailure{Name: t.Name, Error: oneLine(err.Error())})
@@ -102,8 +109,11 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 			} else {
 				logx.Infof("整组更新：容器 %s 更新完成", t.Name)
 				result.Updated = append(result.Updated, t.Name)
-				if cleaned {
+				if outcome.Cleaned {
 					result.CleanedImages++
+				}
+				if outcome.SnapshotRef != "" {
+					result.Snapshots = append(result.Snapshots, outcome.SnapshotRef)
 				}
 				serviceContext.AutoUpdateState.SetContainer(t.Name, true, "更新成功")
 			}

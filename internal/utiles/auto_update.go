@@ -97,10 +97,11 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 		return
 	}
 
-	opts := UpdateOptions{
+	baseOpts := UpdateOptions{
 		SkipPull:        true, // 拉取在下面按镜像统一处理
 		DelOldContainer: delOldContainer,
 		DeleteOldImage:  settings.DeleteOldImage,
+		SnapshotOptions: SnapshotOptionsFromSettings(settings),
 	}
 
 	// 预生成任务 ID 并登记为"进行中"，供 status 接口实时展示
@@ -128,8 +129,10 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 			continue
 		}
 		for _, t := range group {
-			logx.Infof("自动更新：开始更新容器 %s", t.name)
-			cleaned, err := updateContainerCore(serviceContext, t.id, t.name, pullRef, opts, t.taskID)
+			logx.Infof("自动更新：开始更新容器 %s（旧镜像策略 %s）", t.name, settings.ResolveOldImagePolicy(t.name))
+			opts := baseOpts
+			opts.OldImagePolicy = settings.ResolveOldImagePolicy(t.name)
+			outcome, err := updateContainerCore(serviceContext, t.id, t.name, pullRef, opts, t.taskID)
 			if err != nil {
 				logx.Errorf("自动更新：容器 %s 更新失败：%v", t.name, err)
 				result.Failed = append(result.Failed, module.AutoRunFailure{Name: t.name, Error: oneLine(err.Error())})
@@ -137,8 +140,11 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 			} else {
 				logx.Infof("自动更新：容器 %s 更新完成", t.name)
 				result.Updated = append(result.Updated, t.name)
-				if cleaned {
+				if outcome.Cleaned {
 					result.CleanedImages++
+				}
+				if outcome.SnapshotRef != "" {
+					result.Snapshots = append(result.Snapshots, outcome.SnapshotRef)
 				}
 				serviceContext.AutoUpdateState.SetContainer(t.name, true, "更新成功")
 			}
@@ -147,7 +153,7 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 
 	result.DurationSec = float64(int(time.Since(start).Seconds()*10)) / 10
 	serviceContext.AutoUpdateState.AddRun(result)
-	logx.Infof("自动更新完成：%d 成功 / %d 失败 / 清理旧镜像 %d", len(result.Updated), len(result.Failed), result.CleanedImages)
+	logx.Infof("自动更新完成：%d 成功 / %d 失败 / 清理旧镜像 %d / 快照 %d", len(result.Updated), len(result.Failed), result.CleanedImages, len(result.Snapshots))
 	notifyAutoUpdate(serviceContext, result)
 }
 
@@ -187,6 +193,9 @@ func composeAutoUpdateMessage(r module.AutoUpdateRunResult) (title, text string)
 	}
 	if r.CleanedImages > 0 {
 		b.WriteString(fmt.Sprintf("🗑️ 清理旧镜像 %d 个\n", r.CleanedImages))
+	}
+	if len(r.Snapshots) > 0 {
+		b.WriteString(fmt.Sprintf("🏷️ 已打快照 %d 个：%s\n", len(r.Snapshots), strings.Join(r.Snapshots, "、")))
 	}
 	if len(r.Failed) > 0 {
 		b.WriteString(fmt.Sprintf("⚠️ 失败 %d 个：\n", len(r.Failed)))

@@ -18,7 +18,16 @@ type AutoUpdateSettings struct {
 	Containers      []string       `json:"containers"`
 	Exclude         []string       `json:"exclude"`
 	Cron            string         `json:"cron"`
-	DeleteOldImage  bool           `json:"deleteOldImage"`
+	DeleteOldImage  bool           `json:"deleteOldImage"` // 兼容旧配置：true=清理；新字段 OldImagePolicy 优先
+	// 旧镜像处置策略（全局默认）：clean=安全清理 / snapshot=打快照保留 / keep=不处理
+	OldImagePolicy string `json:"oldImagePolicy,optional"`
+	// 每容器覆盖：容器名 → inherit|clean|snapshot|keep（inherit/空 = 继承全局）
+	ContainerPolicy map[string]string `json:"containerPolicy,optional"`
+	// 快照保留数量（每个镜像最多保留几个快照）
+	SnapshotKeep int `json:"snapshotKeep,optional"`
+	// 快照命名空间与命名模板，如 dh-snap + {name}:{date}-{time}
+	SnapshotPrefix   string `json:"snapshotPrefix,optional"`
+	SnapshotTemplate string `json:"snapshotTemplate,optional"`
 	Notify          NotifyChannels `json:"notify"`                  // 通知渠道（飞书/企业微信/钉钉/Bark/Server酱/Telegram/自定义）
 	FeishuWebhook   string         `json:"feishuWebhook,optional"`  // 已弃用：加载时自动迁移到 notify.feishu
 	NotifyOnSuccess bool           `json:"notifyOnSuccess"`
@@ -50,6 +59,13 @@ func (s *AutoUpdateStore) Get() AutoUpdateSettings {
 	d := s.data
 	d.Containers = append([]string{}, d.Containers...)
 	d.Exclude = append([]string{}, d.Exclude...)
+	if d.ContainerPolicy != nil {
+		cp := make(map[string]string, len(d.ContainerPolicy))
+		for k, v := range d.ContainerPolicy {
+			cp[k] = v
+		}
+		d.ContainerPolicy = cp
+	}
 	return d
 }
 
@@ -59,6 +75,7 @@ func (s *AutoUpdateStore) Save(newSet AutoUpdateSettings) error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0755); err != nil {
 		return err
 	}
+	newSet.normalizePolicies()
 	b, err := json.MarshalIndent(newSet, "", "  ")
 	if err != nil {
 		return err
@@ -88,6 +105,52 @@ func (s *AutoUpdateStore) load() {
 		s.data.Notify.Feishu = f
 	}
 	s.data.FeishuWebhook = ""
+	s.data.normalizePolicies()
+}
+
+// normalizePolicies 补全策略相关默认值，并兼容旧的 deleteOldImage 布尔字段
+func (s *AutoUpdateSettings) normalizePolicies() {
+	switch s.OldImagePolicy {
+	case "clean", "snapshot", "keep":
+	default:
+		if s.DeleteOldImage {
+			s.OldImagePolicy = "clean"
+		} else {
+			s.OldImagePolicy = "keep"
+		}
+	}
+	// 保持旧字段与新策略一致，兼容旧前端/回滚
+	s.DeleteOldImage = s.OldImagePolicy == "clean"
+	if s.SnapshotKeep <= 0 {
+		s.SnapshotKeep = 3
+	}
+	if strings.TrimSpace(s.SnapshotPrefix) == "" {
+		s.SnapshotPrefix = "dh-snap"
+	}
+	if strings.TrimSpace(s.SnapshotTemplate) == "" {
+		s.SnapshotTemplate = "{name}:{date}-{time}"
+	}
+	if s.ContainerPolicy == nil {
+		s.ContainerPolicy = map[string]string{}
+	}
+}
+
+// ResolveOldImagePolicy 解析某容器实际生效的旧镜像策略（每容器覆盖 > 全局默认）
+func (s *AutoUpdateSettings) ResolveOldImagePolicy(containerName string) string {
+	if p, ok := s.ContainerPolicy[containerName]; ok {
+		switch strings.ToLower(strings.TrimSpace(p)) {
+		case "clean", "snapshot", "keep":
+			return strings.ToLower(strings.TrimSpace(p))
+		}
+	}
+	switch s.OldImagePolicy {
+	case "clean", "snapshot", "keep":
+		return s.OldImagePolicy
+	}
+	if s.DeleteOldImage {
+		return "clean"
+	}
+	return "keep"
 }
 
 func defaultAutoSettings() AutoUpdateSettings {
@@ -143,6 +206,7 @@ type AutoUpdateRunResult struct {
 	Updated       []string        `json:"updated"`
 	Failed        []AutoRunFailure `json:"failed"`
 	CleanedImages int             `json:"cleanedImages"`
+	Snapshots     []string        `json:"snapshots,omitempty"` // 本次打下的快照引用
 	DurationSec   float64         `json:"durationSec"`
 	Note          string          `json:"note,omitempty"`
 }

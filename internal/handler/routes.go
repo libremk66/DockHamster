@@ -8,6 +8,7 @@ import (
 
 	auth "github.com/libremk66/DockHamster/internal/handler/auth"
 	autoupdate "github.com/libremk66/DockHamster/internal/handler/autoupdate"
+	snapshot "github.com/libremk66/DockHamster/internal/handler/snapshot"
 	container "github.com/libremk66/DockHamster/internal/handler/container"
 	icons "github.com/libremk66/DockHamster/internal/handler/icons"
 	image "github.com/libremk66/DockHamster/internal/handler/image"
@@ -179,6 +180,31 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Method:  http.MethodPost,
 				Path:    "/container/:id/updateGroup",
 				Handler: autoupdate.GroupUpdateHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/snapshot/list",
+				Handler: snapshot.ListHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/snapshot/create",
+				Handler: snapshot.CreateHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/snapshot/rollback",
+				Handler: snapshot.RollbackHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/snapshot/prune",
+				Handler: snapshot.PruneHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodDelete,
+				Path:    "/snapshot",
+				Handler: snapshot.DeleteHandler(serverCtx),
 			},
 		},
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
