@@ -74,14 +74,29 @@ func (i *ImageUpdateData) CheckUpdate(cli DockerInspector, imageList []types.Ima
 	}
 	i.mu.RUnlock()
 
+	// 并发检查（限流 6）：经代理解析 registry 单次约 1~2 秒，
+	// 串行检查 50+ 镜像要 1~2 分钟（UI 的「检查更新」按钮会等到超时），并发后约 10~20 秒。
+	const workers = 6
+	sem := make(chan struct{}, workers)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 	for _, image := range imageList {
 		if strings.Contains(image.ImageName, "libremk66/dockhamster") {
 			continue
 		}
-		if result := i.checkSingleImage(cli, image); result != nil {
-			next[image.ID] = *result
-		}
+		wg.Add(1)
+		go func(img types.Image) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			if result := i.checkSingleImage(cli, img); result != nil {
+				mu.Lock()
+				next[img.ID] = *result
+				mu.Unlock()
+			}
+		}(image)
 	}
+	wg.Wait()
 	i.setAll(next)
 }
 
