@@ -42,7 +42,8 @@ func buildComposeYaml(m module.Manifest) string {
 		fmt.Fprintf(&b, "    container_name: %s\n", yamlQuote(c.Name))
 		if hc != nil {
 			if hc.RestartPolicy.Name != "" {
-				fmt.Fprintf(&b, "    restart: %s\n", hc.RestartPolicy.Name)
+				// 必须加引号：YAML 里裸 no 会被解析成布尔 false
+				fmt.Fprintf(&b, "    restart: %s\n", yamlQuote(hc.RestartPolicy.Name))
 			}
 			if hc.Privileged {
 				b.WriteString("    privileged: true\n")
