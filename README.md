@@ -1,4 +1,8 @@
 # 🐹 DockHamster · 容器仓鼠
+> ⚠️ **本项目已更名为 [DockHamster](https://github.com/libremk66/DockHamster) 并独立维护，本仓库已归档（只读）。**
+> 请移步新仓库获取最新版本与镜像：`libremk66/dockhamster`
+
+
 
 <p align="center"><img src="docs/logo.png" width="112" alt="DockHamster"></p>
 
