@@ -21,6 +21,43 @@ var (
 
 const remoteVersionCacheTTL = 10 * time.Minute
 
+// 版本检测使用多个源，按"直连优先 + 自动兜底"顺序尝试：
+// 海外/可翻墙环境走 GitHub；国内直连不通时自动退到 jsDelivr CDN 或公共镜像。
+// 不需要用户做任何配置。
+var versionSources = []string{
+	"https://raw.githubusercontent.com/libremk66/DockHamster/main/version",
+	"https://cdn.jsdelivr.net/gh/libremk66/DockHamster@main/version",
+	"https://ghfast.top/https://raw.githubusercontent.com/libremk66/DockHamster/main/version",
+}
+
+var preferredSource string
+
+// orderedVersionSources 上次成功的源优先，其余按默认顺序；githubProxy 若配置则作为最优先前缀源
+func orderedVersionSources(githubProxy string) []string {
+	var out []string
+	if githubProxy != "" {
+		out = append(out, githubProxy+"https://raw.githubusercontent.com/libremk66/DockHamster/main/version")
+	}
+	remoteVersionMu.Lock()
+	pref := preferredSource
+	remoteVersionMu.Unlock()
+	if pref != "" {
+		out = append(out, pref)
+	}
+	for _, src := range versionSources {
+		if src != pref {
+			out = append(out, src)
+		}
+	}
+	return out
+}
+
+func markSourceOK(src string) {
+	remoteVersionMu.Lock()
+	preferredSource = src
+	remoteVersionMu.Unlock()
+}
+
 func GetRemoteVersion() (remoteVersion string, err error) {
 	remoteVersionMu.Lock()
 	if remoteVersionCache != "" && time.Since(remoteVersionCacheAt) < remoteVersionCacheTTL {
@@ -34,8 +71,21 @@ func GetRemoteVersion() (remoteVersion string, err error) {
 	if githubProxy != "" {
 		githubProxy = strings.TrimRight(githubProxy, "/") + "/"
 	}
-	versionURL := githubProxy + "https://raw.githubusercontent.com/libremk66/DockHamster/main/version"
-	remoteVersion, err = fetchVersionFromURL(versionURL)
+
+	var lastErr error
+	for _, src := range orderedVersionSources(githubProxy) {
+		v, ferr := fetchVersionFromURL(src)
+		if ferr == nil && strings.TrimSpace(v) != "" {
+			remoteVersion = v
+			markSourceOK(src)
+			err = nil
+			goto fetched
+		}
+		lastErr = ferr
+		logx.Infof("版本源不可用 %s: %v", src, ferr)
+	}
+	err = lastErr
+fetched:
 	if err != nil {
 		// 失败时若有旧缓存，宁可返回旧值（附错误日志），也不让前端拿不到
 		remoteVersionMu.Lock()
@@ -70,7 +120,7 @@ func GetRemoteVersion() (remoteVersion string, err error) {
 func fetchVersionFromURL(url string) (string, error) {
 	// 超时保护：GitHub 不可达时不要让 API 一直挂着
 	client := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: 6 * time.Second,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 		},
