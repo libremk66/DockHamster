@@ -1,0 +1,52 @@
+name: release
+
+# version 文件变化 → 自动打 tag + 建 Release（含自动变更日志）
+# 与 build.yml 配套：同一个 version 文件同时驱动"镜像构建"和"GitHub Release"，三处版本号永远一致
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - version
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: v
+        run: echo "version=$(cat version)" >> "$GITHUB_OUTPUT"
+
+      - name: Create release (skip if exists)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          if gh release view "$V" >/dev/null 2>&1; then
+            echo "Release $V 已存在，跳过"
+            exit 0
+          fi
+          gh release create "$V" \
+            --title "$V" \
+            --generate-notes \
+            --notes "🐹 **DockHamster 容器仓鼠 $V**
+
+**Docker 镜像**：\`libremk66/dockhamster:$V\`（\`latest\` 同步更新，多架构 amd64/arm64）
+
+**怎么更新**
+- 面板内：容器页 → 找到 \`dockhamster\` 容器 → 点「更新」（自动拉新镜像重建，配置数据保留）
+- 命令行：\`docker compose pull && docker compose up -d\`
+
+---
+
+## 本次变更
+"
