@@ -97,7 +97,3 @@ type GetNewImageReq struct {
 type GroupUpdateReq struct {
 	IdReq
 }
-
-type TestNotifyReq struct {
-	Webhook string `json:"webhook,optional"`
-}

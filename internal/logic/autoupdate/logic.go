@@ -3,7 +3,6 @@ package autoupdate
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/onlyLTY/dockerCopilot/internal/module"
 	"github.com/onlyLTY/dockerCopilot/internal/svc"
@@ -95,28 +94,28 @@ func (l *AutoUpdateLogic) Status() (*types.Resp, error) {
 	return resp, nil
 }
 
-// TestNotify 发送一条飞书测试消息（可临时覆盖 webhook）
-func (l *AutoUpdateLogic) TestNotify(req *types.TestNotifyReq) (*types.Resp, error) {
+// TestNotify 发送一条渠道测试消息（draft 为前端当前表单值；为空则用已保存配置）
+func (l *AutoUpdateLogic) TestNotify(channel string, draft *module.NotifyChannel) (*types.Resp, error) {
 	resp := &types.Resp{}
-	webhook := strings.TrimSpace(req.Webhook)
-	if webhook == "" {
-		webhook = l.svcCtx.AutoUpdate.Get().FeishuWebhook
-	}
-	if webhook == "" {
+	if strings.TrimSpace(channel) == "" {
 		resp.Code = 400
-		resp.Msg = "未配置飞书 Webhook（可先在输入框填入再测试）"
+		resp.Msg = "未指定渠道"
 		resp.Data = map[string]interface{}{}
 		return resp, nil
 	}
-	msg := "🔔 这是一条来自 DockerCopilot 的测试消息，通知配置正常。\n时间：" + time.Now().Format("2006-01-02 15:04:05")
-	if err := module.SendFeishu(webhook, msg); err != nil {
+	cfg := l.svcCtx.AutoUpdate.Get().Notify.ChannelByName(channel)
+	if draft != nil {
+		cfg = *draft
+	}
+	res := module.SendChannel(channel, cfg, "🔔 DockerCopilot 通知测试", "如果你看到这条消息，说明该渠道配置成功 ✅")
+	if !res.OK {
 		resp.Code = 500
-		resp.Msg = "发送失败：" + err.Error()
+		resp.Msg = "发送失败：" + res.Error
 		resp.Data = map[string]interface{}{}
 		return resp, nil
 	}
 	resp.Code = 200
-	resp.Msg = "已发送，请查看飞书群"
+	resp.Msg = "已发送，请查看「" + res.Channel + "」"
 	resp.Data = map[string]interface{}{}
 	return resp, nil
 }

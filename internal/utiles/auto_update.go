@@ -159,14 +159,21 @@ func notifyAutoUpdate(serviceContext *svc.ServiceContext, r module.AutoUpdateRun
 	if len(r.Failed) == 0 && !settings.NotifyOnSuccess {
 		return
 	}
-	if err := module.SendFeishu(settings.FeishuWebhook, composeAutoUpdateMessage(r)); err != nil {
-		logx.Errorf("飞书通知发送失败: %v", err)
+	title, text := composeAutoUpdateMessage(r)
+	results := module.SendNotify(settings.Notify, title, text)
+	for _, res := range results {
+		if res.OK {
+			logx.Infof("通知已发送: %s", res.Channel)
+		} else {
+			logx.Errorf("通知发送失败 %s: %s", res.Channel, res.Error)
+		}
 	}
 }
 
-func composeAutoUpdateMessage(r module.AutoUpdateRunResult) string {
+// composeAutoUpdateMessage 生成通知标题与正文（正文不含标题行，各渠道自行拼接）
+func composeAutoUpdateMessage(r module.AutoUpdateRunResult) (title, text string) {
+	title = "🔄 DockerCopilot 自动更新 " + r.Time
 	var b strings.Builder
-	b.WriteString("🔄 DockerCopilot 自动更新 " + r.Time + "\n")
 	if len(r.Updated) > 0 {
 		b.WriteString(fmt.Sprintf("✅ 已更新 %d 个：%s\n", len(r.Updated), strings.Join(r.Updated, "、")))
 	}
@@ -183,7 +190,7 @@ func composeAutoUpdateMessage(r module.AutoUpdateRunResult) string {
 		b.WriteString("ℹ️ " + r.Note + "\n")
 	}
 	b.WriteString(fmt.Sprintf("⏱ 耗时 %.1fs", r.DurationSec))
-	return b.String()
+	return title, b.String()
 }
 
 // oneLine 压成单行并截断（用于失败原因/通知文本）

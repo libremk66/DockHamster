@@ -47,10 +47,6 @@ type GroupUpdateReq {
 	IdReq
 }
 
-type TestNotifyReq {
-	Webhook string `json:"webhook,optional"`
-}
-
 type MsgResp {
 	Status string `json:"status"`
 	Msg    string `json:"msg"`
@@ -221,7 +217,7 @@ service dockerCopilot {
 	get /autoUpdate/status returns (Resp)
 
 	@handler testNotify
-	post /autoUpdate/testNotify (TestNotifyReq) returns (Resp)
+	post /autoUpdate/testNotify returns (Resp)
 
 	@handler groupUpdate
 	post /container/:id/updateGroup (GroupUpdateReq) returns (Resp)

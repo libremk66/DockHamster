@@ -57,13 +57,16 @@ func StatusHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 
 func TestNotifyHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req types.TestNotifyReq
+		var req struct {
+			Channel string                `json:"channel"`
+			Config  *module.NotifyChannel `json:"config,optional"`
+		}
 		if err := httpx.Parse(r, &req); err != nil {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return
 		}
 		l := autoupdate.NewAutoUpdateLogic(r.Context(), svcCtx)
-		resp, err := l.TestNotify(&req)
+		resp, err := l.TestNotify(req.Channel, req.Config)
 		write(w, r, resp, err)
 	}
 }
