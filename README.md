@@ -48,7 +48,7 @@
 
 ![容器页](docs/screenshots/containers.png)
 
-**镜像页**（总镜像 / 使用中 / 未使用 / 无Tag 统计卡筛选，支持搜索）：
+**镜像页**（总镜像 / 使用中 / 未使用 / 快照 / 无Tag 统计卡筛选，支持搜索）：
 
 ![镜像页](docs/screenshots/images.png)
 
