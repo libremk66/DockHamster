@@ -121,6 +121,6 @@ jobs:
           file: ./docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/dockercopilot-custom:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/dockercopilot-custom:${{ env.version }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/dockercopilotme:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/dockercopilotme:${{ env.version }}
           push: true

@@ -1,9 +1,9 @@
-# DockerCopilot · 非官方增强版（dockercopilot-custom）
+# DockerCopilot · 非官方增强版（DockerCopilotMe）
 
 > ⚠️ 本项目是基于 [onlyLTY/dockerCopilot](https://github.com/onlyLTY/dockerCopilot)（AGPL-3.0）的**非官方社区增强分支**。
 > 在官方基础上新增了「自动更新白名单（UI 配置）、旧镜像安全清理、多容器共用镜像整组更新、飞书通知」等实用功能。
 >
-> 🐳 镜像：`libremk66/dockercopilot-custom` ｜ 📦 源码：本仓库（`custom` 分支）｜ 📖 功能详解：[CUSTOM.md](./CUSTOM.md)
+> 🐳 镜像：`libremk66/dockercopilotme` ｜ 📦 源码：本仓库（`custom` 分支）｜ 📖 功能详解：[CUSTOM.md](./CUSTOM.md)
 
 ## 目录
 
@@ -46,7 +46,7 @@
 # docker-compose.yml
 services:
   dockercopilot:
-    image: libremk66/dockercopilot-custom:latest
+    image: libremk66/dockercopilotme:latest
     container_name: dockercopilot
     restart: always
     environment:

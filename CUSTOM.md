@@ -117,7 +117,7 @@ git fetch upstream master && git rebase upstream/master && git push origin custo
 ## 六、构建与发布
 
 - 推送 `custom` 分支 → GitHub Actions（`custom-build.yml`）自动构建 amd64/arm64 并推送：
-  `libremk66/dockercopilot-custom:latest`（同时打 `:vX.Y.Z` 版本 tag）
+  `libremk66/dockercopilotme:latest`（同时打 `:vX.Y.Z` 版本 tag）
 - 需要仓库 Secrets：`DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`
 
 ## 七、许可
