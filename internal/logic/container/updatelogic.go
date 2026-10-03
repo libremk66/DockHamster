@@ -35,8 +35,12 @@ func (l *UpdateLogic) Update(req *types.ContainerUpdateReq) (resp *types.Resp, e
 			}
 		}()
 		imageNameAndTag := req.ImageNameAndTag
-		delOldContainer := os.Getenv("DelOldContainer") != "false"
-		err := utiles.UpdateContainer(l.svcCtx, req.Id, req.ContainerName, imageNameAndTag, delOldContainer, taskID)
+		settings := l.svcCtx.AutoUpdate.Get()
+		opts := utiles.UpdateOptions{
+			DelOldContainer: os.Getenv("DelOldContainer") != "false",
+			DeleteOldImage:  settings.DeleteOldImage,
+		}
+		err := utiles.UpdateContainer(l.svcCtx, req.Id, req.ContainerName, imageNameAndTag, opts, taskID)
 		if err != nil {
 			l.Errorf("Error in UpdateContainer: %v", err)
 		}

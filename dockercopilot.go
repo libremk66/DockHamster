@@ -12,6 +12,7 @@ import (
 
 	"github.com/onlyLTY/dockerCopilot/internal/config"
 	"github.com/onlyLTY/dockerCopilot/internal/handler"
+	"github.com/onlyLTY/dockerCopilot/internal/logic/autoupdate"
 	"github.com/onlyLTY/dockerCopilot/internal/svc"
 	"github.com/onlyLTY/dockerCopilot/internal/utiles"
 	"github.com/robfig/cron/v3"
@@ -101,20 +102,14 @@ export const customImageLogos = {
 		logx.Errorf("panic添加定时任务出错: %v", err)
 		panic(err)
 	}
-	// 自动更新（白名单模式）：AutoUpdateContainers 配置后才生效
-	autoUpdateCron := os.Getenv("AutoUpdateCron")
-	if autoUpdateCron == "" {
-		autoUpdateCron = "0 4 * * *"
-	}
-	_, err = corndanmu.AddFunc(autoUpdateCron, func() {
-		utiles.RunAutoUpdate(ctx)
-	})
-	if err != nil {
-		logx.Errorf("自动更新定时任务添加失败(检查AutoUpdateCron表达式): %v", err)
-	} else {
-		logx.Info("自动更新任务已注册，调度: " + autoUpdateCron)
-	}
+	// 自动更新调度：注册到 cron 引擎（设置由 UI 持久化，改 cron 会重注册）
+	ctx.CronEngine = corndanmu
 	corndanmu.Start()
+	if err := autoupdate.RegisterAutoUpdateCron(ctx); err != nil {
+		logx.Errorf("自动更新定时任务注册失败(检查 cron 表达式): %v", err)
+	} else {
+		logx.Info("自动更新任务已注册，调度: " + ctx.AutoUpdate.Get().Cron)
+	}
 	defer corndanmu.Stop()
 	httpx.SetErrorHandler(func(err error) (int, any) {
 		switch e := err.(type) {

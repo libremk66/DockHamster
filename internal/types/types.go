@@ -93,3 +93,11 @@ type VersionReq struct {
 type GetNewImageReq struct {
 	ImageNameAndTag string `json:"image_name_and_tag"`
 }
+
+type GroupUpdateReq struct {
+	IdReq
+}
+
+type TestNotifyReq struct {
+	Webhook string `json:"webhook,optional"`
+}
