@@ -2,6 +2,10 @@
 
 <p align="center"><img src="docs/logo.png" width="112" alt="DockHamster"></p>
 
+[![Docker Hub](https://img.shields.io/docker/v/libremk66/dockhamster?label=docker%20hub&logo=docker&logoColor=white)](https://hub.docker.com/r/libremk66/dockhamster)
+[![Docker Pulls](https://img.shields.io/docker/pulls/libremk66/dockhamster)](https://hub.docker.com/r/libremk66/dockhamster)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+
 > **Docker 容器管理面板 · 增强版**
 > 基于 [onlyLTY/dockerCopilot](https://github.com/onlyLTY/dockerCopilot)（AGPL-3.0）二次开发，专注"省心的容器运维"：自动更新、旧镜像清理、整组更新、多渠道通知、实时进度、列表化界面。
 
