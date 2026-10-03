@@ -138,7 +138,8 @@ func (l *SnapshotLogic) Rollback(req *types.SnapshotRollbackReq) (resp *types.Re
 			l.Errorf("回滚前快照失败(继续回滚): %v", serr)
 		}
 		// ② 把容器原本的镜像引用指回快照镜像（保持容器镜像名不变，后续更新不受影响）
-		if terr := l.svcCtx.DockerClient.ImageTag(l.ctx, targetInspect.ID, originalRef); terr != nil {
+		// 必须用独立 context：HTTP 响应返回后请求 ctx 被取消，用 l.ctx 会直接失败
+		if terr := l.svcCtx.DockerClient.ImageTag(context.Background(), targetInspect.ID, originalRef); terr != nil {
 			l.Errorf("回滚失败：重新标记 %s 出错: %v", originalRef, terr)
 			l.svcCtx.UpdateProgress(taskID, svc.TaskProgress{
 				TaskID: taskID, Name: req.ContainerName, Percentage: 100,
