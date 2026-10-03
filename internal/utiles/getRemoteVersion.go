@@ -5,12 +5,31 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/libremk66/DockHamster/internal/config"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
+// 远端版本查询的缓存：网络抖动/GitHub 不可达时不至于让界面丢信息，也避免每次都打网络
+var (
+	remoteVersionCache   string
+	remoteVersionCacheAt time.Time
+	remoteVersionMu      sync.Mutex
+)
+
+const remoteVersionCacheTTL = 10 * time.Minute
+
 func GetRemoteVersion() (remoteVersion string, err error) {
+	remoteVersionMu.Lock()
+	if remoteVersionCache != "" && time.Since(remoteVersionCacheAt) < remoteVersionCacheTTL {
+		cached := remoteVersionCache
+		remoteVersionMu.Unlock()
+		return cached, nil
+	}
+	remoteVersionMu.Unlock()
+
 	githubProxy := os.Getenv("githubProxy")
 	if githubProxy != "" {
 		githubProxy = strings.TrimRight(githubProxy, "/") + "/"
@@ -18,8 +37,20 @@ func GetRemoteVersion() (remoteVersion string, err error) {
 	versionURL := githubProxy + "https://raw.githubusercontent.com/libremk66/DockHamster/main/version"
 	remoteVersion, err = fetchVersionFromURL(versionURL)
 	if err != nil {
+		// 失败时若有旧缓存，宁可返回旧值（附错误日志），也不让前端拿不到
+		remoteVersionMu.Lock()
+		cached := remoteVersionCache
+		remoteVersionMu.Unlock()
+		if cached != "" {
+			logx.Infof("远端版本查询失败，返回缓存值 %s: %v", cached, err)
+			return cached, nil
+		}
 		return "0.0.0", err
 	}
+	remoteVersionMu.Lock()
+	remoteVersionCache = remoteVersion
+	remoteVersionCacheAt = time.Now()
+	remoteVersionMu.Unlock()
 
 	localVersion := config.Version
 	if strings.Contains(localVersion, "FNOS") {
@@ -37,7 +68,9 @@ func GetRemoteVersion() (remoteVersion string, err error) {
 }
 
 func fetchVersionFromURL(url string) (string, error) {
+	// 超时保护：GitHub 不可达时不要让 API 一直挂着
 	client := &http.Client{
+		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 		},
