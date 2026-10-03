@@ -20,7 +20,7 @@ type AutoUpdateSettings struct {
 	Cron            string         `json:"cron"`
 	DeleteOldImage  bool           `json:"deleteOldImage"`
 	Notify          NotifyChannels `json:"notify"`                  // 通知渠道（飞书/企业微信/钉钉/Bark/Server酱/Telegram/自定义）
-	FeishuWebhook   string         `json:"feishuWebhook,omitempty"` // 已弃用：加载时自动迁移到 notify.feishu
+	FeishuWebhook   string         `json:"feishuWebhook,optional"`  // 已弃用：加载时自动迁移到 notify.feishu
 	NotifyOnSuccess bool           `json:"notifyOnSuccess"`
 	NotifyOnFailure bool           `json:"notifyOnFailure"`
 }

@@ -17,20 +17,21 @@ import (
 // ===== 通知渠道（移植自音乐仓鼠的通知模块：7 渠道 / 单向推送 / 失败不影响主流程） =====
 
 // NotifyChannel 单个渠道配置（字段按渠道选用）
+// 注意：tag 用 go-zero 的 ,optional（不能用 omitempty —— 输出省略后请求校验会当必填拒绝）
 type NotifyChannel struct {
 	Enabled      bool   `json:"enabled"`
-	Webhook      string `json:"webhook,omitempty"`      // 飞书/企业微信/钉钉 群机器人地址
-	Secret       string `json:"secret,omitempty"`       // 飞书/钉钉 加签密钥（可选）
-	Server       string `json:"server,omitempty"`       // Bark 服务器（默认 https://api.day.app）
-	Key          string `json:"key,omitempty"`          // Bark Key
-	SendKey      string `json:"sendKey,omitempty"`      // Server酱 SendKey
-	Token        string `json:"token,omitempty"`        // Telegram Bot Token
-	ChatID       string `json:"chatId,omitempty"`       // Telegram chat_id
-	APIBase      string `json:"apiBase,omitempty"`      // Telegram API 地址（可填反代）
-	URL          string `json:"url,omitempty"`          // 自定义 Webhook URL
-	Method       string `json:"method,omitempty"`       // 自定义 Webhook 方法 POST/GET
-	Headers      string `json:"headers,omitempty"`      // 自定义请求头（JSON 文本）
-	BodyTemplate string `json:"bodyTemplate,omitempty"` // 自定义 body 模板（{title} {text}）
+	Webhook      string `json:"webhook,optional"`      // 飞书/企业微信/钉钉 群机器人地址
+	Secret       string `json:"secret,optional"`       // 飞书/钉钉 加签密钥（可选）
+	Server       string `json:"server,optional"`       // Bark 服务器（默认 https://api.day.app）
+	Key          string `json:"key,optional"`          // Bark Key
+	SendKey      string `json:"sendKey,optional"`      // Server酱 SendKey
+	Token        string `json:"token,optional"`        // Telegram Bot Token
+	ChatID       string `json:"chatId,optional"`       // Telegram chat_id
+	APIBase      string `json:"apiBase,optional"`      // Telegram API 地址（可填反代）
+	URL          string `json:"url,optional"`          // 自定义 Webhook URL
+	Method       string `json:"method,optional"`       // 自定义 Webhook 方法 POST/GET
+	Headers      string `json:"headers,optional"`      // 自定义请求头（JSON 文本）
+	BodyTemplate string `json:"bodyTemplate,optional"` // 自定义 body 模板（{title} {text}）
 }
 
 // NotifyChannels 全部渠道
