@@ -77,6 +77,60 @@
 - 交互保持不变：点行打开详情，Ctrl/Cmd+点击或批量模式勾选；统计卡筛选与搜索叠加生效
 - 移动端自动折行排版（每行折为「标题行 + 信息行 + 操作行」）
 
+### 8. 镜像快照与回滚
+
+更新容器时，**旧镜像**（更新前那一份）有三种处置方式，可全局设默认、也可给单个容器指定：
+
+| 策略 | 行为 |
+|---|---|
+| **清理**（默认） | 满足安全条件（无容器引用、无标签、非新镜像）才删除，省空间 |
+| **打快照保留** | 给旧镜像打上 `dh-snap/<名字>:<日期>-<时分>` 标签 → 天然免于自动清理，可随时回滚 |
+| 保留不处理 | 什么都不做（旧行为） |
+
+- **多容器共用镜像时"保留优先"**：任何一个容器要求快照，就给旧镜像打快照
+- **保留数量**：每个镜像默认只留最近 3 个快照，超量自动清理（走同样的安全条件）
+- **回滚**：容器行出现「回滚」按钮（仅当有可用快照）→ 选一个快照 → 用它重建容器
+  - **回滚前会自动给当前版本也打一份快照** → 回滚可逆（双向）
+  - 回滚复用标准更新流程（重建 + 保持原运行状态），全程进度条
+- **占用可见**：自动更新页显示快照数量 / 占用 / 系统盘剩余；镜像页新增「快照」分类可批量清理
+- 快照打的是**独立命名空间**（默认 `dh-snap/`），不参与"更新检测"，也不会被旧镜像清理删掉
+
+### 9. 容器迁移（本地包）
+
+三步闭环，全程零外部依赖（不需要 registry、不需要联网）：
+
+**① 镜像体检** — 扫描全部镜像并分类：
+
+| 分类 | 判定 | 含义 |
+|---|---|---|
+| 公共可得 | 有 RepoDigests（从仓库拉过） | 目标机可直接 pull，无需搬运 |
+| 本地构建 | 有 tag 但无 digest | 换机即丢，**必须打包搬运** |
+| 悬空 | 无任何 tag | 连名字都没有，先打标签才能搬运 |
+
+**② 打包导出** — 选中容器/镜像 → 生成单个 `.tar.gz` 迁移包，内含：
+
+```
+manifest.json      机器可读清单（镜像摘要 + 容器配方 + 校验和）
+images/*.tar.gz    docker save 出来的镜像（流式导出，字节级进度）
+compose.yaml       可直接使用的 compose 文件（含全部容器定义）
+import.sh          无面板一键导入脚本（只用标准 docker 命令）
+README.txt         场景化导入指引（有面板 / 只有 Docker / 手工）
+checksums.txt      校验和（sha256sum -c 可验证完整性）
+```
+
+- 可选：镜像压缩（gzip）、环境变量脱敏（密码/Token 类默认替换为 ****）
+- 容器配置原样保存，保证精确重建
+
+**③ 上传导入** — 上传包 → **预检（dry-run）** → 执行：
+
+- 预检逐容器给出：镜像可得性（本地已有 / 包内提供 / 可拉取 / 缺失）、名字冲突（自动建议新名）、端口冲突（谁占用了）、卷路径状态（**确不存在** / **面板不可见待确认**，后者附同名目录映射建议）
+- 覆盖项：容器改名、宿主端口重映射、卷路径重映射、缺失目录自动创建、导入后自动启动（仅启动原本在运行的）
+- 执行时按需 `docker load` 包内镜像 → 应用覆盖 → 重建容器，进度实时可见
+
+**无面板导入**（换机迁移的常见情形）：包内 `import.sh` 支持 `--dry-run`（只检查：磁盘空间 / 校验和 / 卷路径 / compose 语法），确认后直接执行即可；也可把 `compose.yaml` 粘进 Portainer 等其它面板。
+
+> 架构说明：镜像搬运记录使用 `transports[]` 数组（当前实现 `archive`；`registry` 为预留扩展位），导入端按 `本地已有 → 包内 → registry` 顺序兜底——后续接入自建 registry / Docker Hub 私有仓库是纯增量。
+
 ## 二、环境变量（仅初始默认值）
 
 环境变量只在 `/data/config/autoUpdate.json` **不存在时**用于生成初始配置；之后一律以页面配置为准。
@@ -101,6 +155,20 @@
 | GET | `/api/autoUpdate/status` | 运行状态 + 最近 30 次记录 + 每容器最近结果 |
 | POST | `/api/autoUpdate/testNotify` | 渠道测试发送（`{channel, config}`；config 为前端当前表单值） |
 | POST | `/api/container/:id/updateGroup` | 整组更新（更新与该容器共用同一镜像的所有容器，返回各容器任务 ID） |
+| GET | `/api/snapshot/list` | 快照列表 + 占用统计（数量/大小/磁盘剩余/保留数量） |
+| POST | `/api/snapshot/create` | 手动给容器当前镜像打快照（`{containerName}` 或 `{imageId}`） |
+| POST | `/api/snapshot/rollback` | 回滚到快照（`{containerName, ref}`，回滚前自动快照当前版本） |
+| POST | `/api/snapshot/prune` | 按保留数量清理超量快照（`{keep}` 可选） |
+| DELETE | `/api/snapshot?refs=a,b` | 删除指定快照（被容器使用的会拒绝） |
+| GET | `/api/migrate/images/report` | 镜像体检（分类 + 风险统计 + 磁盘剩余） |
+| POST | `/api/migrate/images/tag` | 给镜像打可搬运标签（`{imageId, ref}`，同名指向他人时拒绝覆盖） |
+| POST | `/api/migrate/exports` | 生成迁移包（异步，返回 taskID） |
+| GET | `/api/migrate/exports` | 迁移包列表 |
+| GET | `/api/migrate/exports/download?file=` | 流式下载（支持断点续传） |
+| DELETE | `/api/migrate/exports?file=` | 删除迁移包 |
+| POST | `/api/migrate/imports/upload` | 上传迁移包（multipart，≤10GB） |
+| POST | `/api/migrate/imports/plan` | 导入预检（dry-run，`{file}`） |
+| POST | `/api/migrate/imports/apply` | 执行导入（`{file, items[], start, autoCreateDirs}`，异步） |
 
 ## 四、代码位置（定制改动集中在）
 
@@ -112,6 +180,14 @@ internal/utiles/group_update.go    新增：整组更新
 internal/utiles/cleanup.go         新增：旧镜像安全清理
 internal/logic/autoupdate/         新增：设置/运行/状态/测试 逻辑 + cron 重注册
 internal/handler/autoupdate/       新增：handlers
+internal/module/migrate.go          新增：迁移包模型 + 搬运抽象（transports[] 多路线扩展位）
+internal/utiles/snapshot.go         新增：镜像快照（打标签/保留清理/占用统计/防覆盖）
+internal/utiles/migrate_classify.go 新增：镜像体检分类 + 可搬运标签
+internal/utiles/migrate_export.go   新增：迁移包导出（流式 save + 打包 + 进度）
+internal/utiles/migrate_import.go   新增：导入预检 + 执行（load/覆盖/重建）
+internal/utiles/migrate_artifacts.go / migrate_templates.go  新增：compose 生成 + import.sh/README 模板
+internal/logic/snapshot/ + handler/snapshot/   新增：快照 API
+internal/logic/migrate/ + handler/migrate/     新增：迁移 API
 internal/module/checkupdate.go     修改：digest 判定修复 + 并发锁 + 过期清理
 internal/utiles/updatecontainer.go 修改：更新选项、状态保持、清理挂钩
 internal/utiles/getcontainerlist.go 修改：改用并发安全的查询方法
@@ -121,7 +197,7 @@ internal/types/types.go / svc / dockercopilot.go  小改
 ```
 
 前端（[libremk66/DockHamster-UI](https://github.com/libremk66/DockHamster-UI)）：
-`src/components/AutoUpdate.jsx`（新增页面）、`Containers.jsx`（列表化/搜索/开关/整组弹窗/进度子行）、`Images.jsx`（列表化/搜索）、`ProgressBar.jsx`、`Header.jsx`、`App.jsx`、`api/client.js`。
+`src/components/AutoUpdate.jsx`（新增页面：白名单/通知/进度/旧镜像策略）、`Containers.jsx`（列表化/搜索/开关/整组弹窗/进度子行/回滚入口）、`Images.jsx`（列表化/搜索/快照分类）、`Migrate.jsx`（迁移页：体检/导出/导入）、`ProgressBar.jsx`、`Header.jsx`、`App.jsx`、`api/client.js`。
 
 ## 五、与上游的关系
 
