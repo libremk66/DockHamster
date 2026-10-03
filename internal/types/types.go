@@ -26,6 +26,42 @@ type CreateContainerReq struct {
 
 // ── 镜像快照 ──────────────────────────────────────────────
 
+// ── 容器迁移 ──────────────────────────────────────────────
+
+type MigrateTagReq struct {
+	ImageID string `json:"imageId"`
+	Ref     string `json:"ref"`
+}
+
+type MigrateExportReq struct {
+	Containers    []string `json:"containers,optional"`
+	IncludeImages bool     `json:"includeImages,optional"`
+	Compress      bool     `json:"compress,optional"`
+	RedactEnv     bool     `json:"redactEnv,optional"`
+	LocalImages   []string `json:"localImages,optional"`
+	Note          string   `json:"note,optional"`
+}
+
+type MigratePlanReq struct {
+	File string `json:"file"`
+}
+
+type MigrateItemOverride struct {
+	Name           string            `json:"name"`
+	Skip           bool              `json:"skip,optional"`
+	NewName        string            `json:"newName,optional"`
+	PortMap        map[string]string `json:"portMap,optional"`
+	MountMap       map[string]string `json:"mountMap,optional"`
+	AutoCreateDirs bool              `json:"autoCreateDirs,optional"`
+}
+
+type MigrateApplyReq struct {
+	File           string                 `json:"file"`
+	Items          []MigrateItemOverride  `json:"items,optional"`
+	Start          bool                   `json:"start,optional"`
+	AutoCreateDirs bool                   `json:"autoCreateDirs,optional"`
+}
+
 type SnapshotCreateReq struct {
 	ContainerName string `json:"containerName,optional"`
 	ImageID       string `json:"imageId,optional"`

@@ -9,6 +9,7 @@ import (
 	auth "github.com/libremk66/DockHamster/internal/handler/auth"
 	autoupdate "github.com/libremk66/DockHamster/internal/handler/autoupdate"
 	snapshot "github.com/libremk66/DockHamster/internal/handler/snapshot"
+	migrate "github.com/libremk66/DockHamster/internal/handler/migrate"
 	container "github.com/libremk66/DockHamster/internal/handler/container"
 	icons "github.com/libremk66/DockHamster/internal/handler/icons"
 	image "github.com/libremk66/DockHamster/internal/handler/image"
@@ -205,6 +206,51 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Method:  http.MethodDelete,
 				Path:    "/snapshot",
 				Handler: snapshot.DeleteHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/migrate/images/report",
+				Handler: migrate.ImageReportHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/migrate/images/tag",
+				Handler: migrate.TagImageHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/migrate/exports",
+				Handler: migrate.ExportHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/migrate/exports",
+				Handler: migrate.ListExportsHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/migrate/exports/download",
+				Handler: migrate.DownloadExportHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodDelete,
+				Path:    "/migrate/exports",
+				Handler: migrate.DeleteExportHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/migrate/imports/upload",
+				Handler: migrate.UploadImportHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/migrate/imports/plan",
+				Handler: migrate.PlanImportHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/migrate/imports/apply",
+				Handler: migrate.ApplyImportHandler(serverCtx),
 			},
 		},
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
