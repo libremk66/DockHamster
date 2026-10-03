@@ -161,9 +161,15 @@ func BuildImportPlan(svcCtx *svc.ServiceContext, pkgPath, pkgName string) (*modu
 				continue
 			}
 			if _, serr := os.Stat(v.Source); serr != nil {
-				item.MissingMounts = append(item.MissingMounts, v)
-				if alt := suggestSimilarPath(v.Source); alt != "" {
-					item.MountSuggest[v.Source] = alt
+				if pathVisibleToPanel(v.Source) {
+					// 上级目录可见 → 确属不存在
+					item.MissingMounts = append(item.MissingMounts, v)
+					if alt := suggestSimilarPath(v.Source); alt != "" {
+						item.MountSuggest[v.Source] = alt
+					}
+				} else {
+					// 面板容器没有挂载该路径族（如宿主 /media、/volume1）→ 无法确认，交人工判断
+					item.Unverifiable = append(item.Unverifiable, v)
 				}
 			}
 		}
@@ -434,6 +440,32 @@ func suggestFreeName(name string, used map[string]bool) string {
 		}
 	}
 	return name + "-imported"
+}
+
+// pathVisibleToPanel 判断该路径的"第一级目录"在面板容器里是否可见：
+// 可见 = 我们能看到它的父目录，从而能确定它真的不存在；
+// 不可见 = 面板没挂载这一族路径（如宿主 /media、/volume1），检查会误报，标记为"待人工确认"。
+func pathVisibleToPanel(p string) bool {
+	parts := strings.Split(strings.TrimPrefix(p, "/"), "/")
+	if len(parts) == 0 {
+		return true
+	}
+	top := "/" + parts[0]
+	if _, err := os.Stat(top); err != nil {
+		return false // 连第一级目录都看不到 → 面板未挂载
+	}
+	// 逐级向上找到第一个存在的祖先
+	cur := p
+	for {
+		parent := filepath.Dir(cur)
+		if parent == cur || parent == "/" || parent == "." {
+			return true
+		}
+		if _, err := os.Stat(parent); err == nil {
+			return true // 父目录存在而自身不存在 → 确属缺失
+		}
+		cur = parent
+	}
 }
 
 // suggestSimilarPath 在常见挂载根目录下寻找同名目录，作为卷路径迁移建议

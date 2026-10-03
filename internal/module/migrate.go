@@ -85,7 +85,8 @@ type ImportPlanItem struct {
 	NameConflict  bool              `json:"nameConflict"`  // 已存在同名容器
 	SuggestedName string            `json:"suggestedName"` // 冲突时的建议名
 	PortConflicts []string          `json:"portConflicts"` // 被占用的宿主端口
-	MissingMounts []ManifestVolume  `json:"missingMounts"` // 目标机不存在的宿主路径
+	MissingMounts []ManifestVolume  `json:"missingMounts"` // 目标机确认不存在的宿主路径
+	Unverifiable  []ManifestVolume  `json:"unverifiable"`  // 面板容器看不到的路径（可能误报，需人工确认）
 	MountSuggest  map[string]string `json:"mountSuggest"`  // 源路径 → 建议映射（按同名目录）
 	Privileged    bool              `json:"privileged"`
 	WasRunning    bool              `json:"wasRunning"`
