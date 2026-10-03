@@ -2,12 +2,14 @@
 
 > 本分支 = 官方 [onlyLTY/dockerCopilot](https://github.com/onlyLTY/dockerCopilot)（`latest`）**+ 以下增强**。
 > `latest` 分支永远保持与官方一致；所有定制都集中在 `custom` 分支，便于持续跟随上游。
+>
+> 配套前端：[libremk66/Docker-Copilot-React](https://github.com/libremk66/Docker-Copilot-React)（`custom` 分支）。
 
 ## 一、功能总览
 
 ### 1. 自动更新（UI 配置 + 定时执行）
 
-- **入口**：侧栏「自动更新」页 + 容器卡片 ⚡ 快捷开关
+- **入口**：侧栏「自动更新」页 + 容器页列表的自动更新开关
 - 按 `cron` 计划（默认 `0 4 * * *`）自动更新白名单容器；**不配置白名单 = 保持官方纯手动模式**
 - 配置持久化在 `/data/config/autoUpdate.json`（UI 保存即生效；环境变量仅作首次生成时的默认值）
 - 运行记录（最近 30 次：时间/触发方式/成功失败明细/清理统计/耗时）+ 每容器最近一次结果
@@ -64,8 +66,16 @@
 
 - 批量运行（定时/手动）：「自动更新」页出现「进行中」面板——每容器一行实时进度条 + 阶段文案 + 拉取细节（运行期 2 秒刷新，点「立即运行」后立即显示）
 - 拉取阶段使用**真实字节百分比**（Docker 进度流 `current/total` 映射 5%~60%），并带**心跳**（每 2 秒刷新已耗时），长任务不再"看起来卡死"
-- 单容器更新：容器卡片直接显示进度条 + 阶段 + 字节级细节
+- 单容器更新：容器行内**整行展开进度子行**（进度条 + 阶段 + 字节级细节 + 百分比），信息全宽可见
 - 前端轮询策略：运行中 2 秒 / 空闲 10 秒；15 分钟兜底 + 真正 3 分钟无任何变化才暂停刷新（大镜像不再"假超时"）
+
+### 7. 列表化界面与搜索
+
+- **容器页**：一行 = 一个容器，列：名称/镜像 · 状态 · 自动更新（行内开关 + 上次结果）· 可升级 · 操作；更新中该行下方展开进度子行
+- **镜像页**：一行 = 一个镜像，列：镜像 · 大小 · 使用情况（使用中/未使用药丸）· 创建时间 · 操作（Hub / 删除 / 强删）；悬空镜像标注"无标签（悬空）"
+- **搜索**：容器按名称/镜像、镜像按名称/Tag/ID 实时过滤，带"筛选出 X / 共 Y"计数与无结果提示
+- 交互保持不变：点行打开详情，Ctrl/Cmd+点击或批量模式勾选；统计卡筛选与搜索叠加生效
+- 移动端自动折行排版（每行折为「标题行 + 信息行 + 操作行」）
 
 ## 二、环境变量（仅初始默认值）
 
@@ -111,7 +121,7 @@ internal/types/types.go / svc / dockercopilot.go  小改
 ```
 
 前端（[libremk66/Docker-Copilot-React](https://github.com/libremk66/Docker-Copilot-React) `custom` 分支）：
-`src/components/AutoUpdate.jsx`（新增页面）、`Containers.jsx`（开关/徽标/整组弹窗）、`Header.jsx`、`App.jsx`、`api/client.js`。
+`src/components/AutoUpdate.jsx`（新增页面）、`Containers.jsx`（列表化/搜索/开关/整组弹窗/进度子行）、`Images.jsx`（列表化/搜索）、`ProgressBar.jsx`、`Header.jsx`、`App.jsx`、`api/client.js`。
 
 ## 五、跟随官方更新
 
