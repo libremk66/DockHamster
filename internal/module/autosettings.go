@@ -14,14 +14,15 @@ import (
 // AutoUpdateSettings 自动更新配置（由 UI 读写并持久化到 /data/config/autoUpdate.json；
 // 环境变量仅作为首次生成配置时的默认值，之后以文件为准）
 type AutoUpdateSettings struct {
-	Enabled         bool     `json:"enabled"`
-	Containers      []string `json:"containers"`
-	Exclude         []string `json:"exclude"`
-	Cron            string   `json:"cron"`
-	DeleteOldImage  bool     `json:"deleteOldImage"`
-	FeishuWebhook   string   `json:"feishuWebhook"`
-	NotifyOnSuccess bool     `json:"notifyOnSuccess"`
-	NotifyOnFailure bool     `json:"notifyOnFailure"`
+	Enabled         bool           `json:"enabled"`
+	Containers      []string       `json:"containers"`
+	Exclude         []string       `json:"exclude"`
+	Cron            string         `json:"cron"`
+	DeleteOldImage  bool           `json:"deleteOldImage"`
+	Notify          NotifyChannels `json:"notify"`                  // 通知渠道（飞书/企业微信/钉钉/Bark/Server酱/Telegram/自定义）
+	FeishuWebhook   string         `json:"feishuWebhook,omitempty"` // 已弃用：加载时自动迁移到 notify.feishu
+	NotifyOnSuccess bool           `json:"notifyOnSuccess"`
+	NotifyOnFailure bool           `json:"notifyOnFailure"`
 }
 
 type AutoUpdateStore struct {
@@ -77,6 +78,16 @@ func (s *AutoUpdateStore) load() {
 	if err := json.Unmarshal(b, &s.data); err != nil {
 		logx.Errorf("解析自动更新配置失败(用默认值): %v", err)
 	}
+	// 兼容旧版单渠道字段：feishuWebhook → notify.feishu
+	if s.data.FeishuWebhook != "" && !s.data.Notify.Feishu.Enabled {
+		f := s.data.Notify.Feishu
+		f.Enabled = true
+		if f.Webhook == "" {
+			f.Webhook = s.data.FeishuWebhook
+		}
+		s.data.Notify.Feishu = f
+	}
+	s.data.FeishuWebhook = ""
 }
 
 func defaultAutoSettings() AutoUpdateSettings {
@@ -103,7 +114,7 @@ func defaultAutoSettings() AutoUpdateSettings {
 		se.DeleteOldImage = false
 	}
 	if v := strings.TrimSpace(os.Getenv("FeishuWebhook")); v != "" {
-		se.FeishuWebhook = v
+		se.Notify.Feishu = NotifyChannel{Enabled: true, Webhook: v}
 	}
 	return se
 }
