@@ -55,6 +55,14 @@ func CheckNowHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	}
 }
 
+func CheckStatusHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := autoupdate.NewAutoUpdateLogic(r.Context(), svcCtx)
+		resp, err := l.CheckStatus()
+		write(w, r, resp, err)
+	}
+}
+
 func StatusHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		l := autoupdate.NewAutoUpdateLogic(r.Context(), svcCtx)

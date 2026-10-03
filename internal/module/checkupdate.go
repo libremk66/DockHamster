@@ -58,7 +58,7 @@ type DockerInspector interface {
 	DistributionInspect(ctx context.Context, image, encodedRegistryAuth string) (registry.DistributionInspect, error)
 }
 
-func (i *ImageUpdateData) CheckUpdate(cli DockerInspector, imageList []types.Image) {
+func (i *ImageUpdateData) CheckUpdate(cli DockerInspector, imageList []types.Image, onProgress func(done, total, need int)) {
 	// 保留本地仍存在的镜像的旧状态（单次查询失败不至于丢状态），
 	// 同时清理已不存在镜像的过期条目（避免"阴魂不散"的更新提示）。
 	i.mu.RLock()
@@ -80,6 +80,13 @@ func (i *ImageUpdateData) CheckUpdate(cli DockerInspector, imageList []types.Ima
 	sem := make(chan struct{}, workers)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
+	total := 0
+	for _, image := range imageList {
+		if !strings.Contains(image.ImageName, "libremk66/dockhamster") {
+			total++
+		}
+	}
+	done, needCnt := 0, 0
 	for _, image := range imageList {
 		if strings.Contains(image.ImageName, "libremk66/dockhamster") {
 			continue
@@ -89,11 +96,19 @@ func (i *ImageUpdateData) CheckUpdate(cli DockerInspector, imageList []types.Ima
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			if result := i.checkSingleImage(cli, img); result != nil {
-				mu.Lock()
+			result := i.checkSingleImage(cli, img)
+			mu.Lock()
+			if result != nil {
 				next[img.ID] = *result
-				mu.Unlock()
+				if result.NeedUpdate {
+					needCnt++
+				}
 			}
+			done++
+			if onProgress != nil {
+				onProgress(done, total, needCnt)
+			}
+			mu.Unlock()
 		}(image)
 	}
 	wg.Wait()

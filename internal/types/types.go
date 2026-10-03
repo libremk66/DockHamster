@@ -56,10 +56,10 @@ type MigrateItemOverride struct {
 }
 
 type MigrateApplyReq struct {
-	File           string                 `json:"file"`
-	Items          []MigrateItemOverride  `json:"items,optional"`
-	Start          bool                   `json:"start,optional"`
-	AutoCreateDirs bool                   `json:"autoCreateDirs,optional"`
+	File           string                `json:"file"`
+	Items          []MigrateItemOverride `json:"items,optional"`
+	Start          bool                  `json:"start,optional"`
+	AutoCreateDirs bool                  `json:"autoCreateDirs,optional"`
 }
 
 type SnapshotCreateReq struct {

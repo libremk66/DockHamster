@@ -14,13 +14,13 @@ import (
 // AutoUpdateSettings 自动更新配置（由 UI 读写并持久化到 /data/config/autoUpdate.json；
 // 环境变量仅作为首次生成配置时的默认值，之后以文件为准）
 type AutoUpdateSettings struct {
-	Enabled         bool           `json:"enabled"`
-	Containers      []string       `json:"containers"`
-	Exclude         []string       `json:"exclude"`
-	Cron            string         `json:"cron"`
+	Enabled    bool     `json:"enabled"`
+	Containers []string `json:"containers"`
+	Exclude    []string `json:"exclude"`
+	Cron       string   `json:"cron"`
 	// 更新检查频率（只读探测 registry，不影响容器）；默认每小时 30 分
-	CheckCron string `json:"checkCron,optional"`
-	DeleteOldImage  bool           `json:"deleteOldImage"` // 兼容旧配置：true=清理；新字段 OldImagePolicy 优先
+	CheckCron      string `json:"checkCron,optional"`
+	DeleteOldImage bool   `json:"deleteOldImage"` // 兼容旧配置：true=清理；新字段 OldImagePolicy 优先
 	// 旧镜像处置策略（全局默认）：clean=安全清理 / snapshot=打快照保留 / keep=不处理
 	OldImagePolicy string `json:"oldImagePolicy,optional"`
 	// 每容器覆盖：容器名 → inherit|clean|snapshot|keep（inherit/空 = 继承全局）
@@ -28,12 +28,12 @@ type AutoUpdateSettings struct {
 	// 快照保留数量（每个镜像最多保留几个快照）
 	SnapshotKeep int `json:"snapshotKeep,optional"`
 	// 快照命名空间与命名模板，如 dh-snap + {name}:{date}-{time}
-	SnapshotPrefix   string `json:"snapshotPrefix,optional"`
-	SnapshotTemplate string `json:"snapshotTemplate,optional"`
-	Notify          NotifyChannels `json:"notify"`                  // 通知渠道（飞书/企业微信/钉钉/Bark/Server酱/Telegram/自定义）
-	FeishuWebhook   string         `json:"feishuWebhook,optional"`  // 已弃用：加载时自动迁移到 notify.feishu
-	NotifyOnSuccess bool           `json:"notifyOnSuccess"`
-	NotifyOnFailure bool           `json:"notifyOnFailure"`
+	SnapshotPrefix   string         `json:"snapshotPrefix,optional"`
+	SnapshotTemplate string         `json:"snapshotTemplate,optional"`
+	Notify           NotifyChannels `json:"notify"`                 // 通知渠道（飞书/企业微信/钉钉/Bark/Server酱/Telegram/自定义）
+	FeishuWebhook    string         `json:"feishuWebhook,optional"` // 已弃用：加载时自动迁移到 notify.feishu
+	NotifyOnSuccess  bool           `json:"notifyOnSuccess"`
+	NotifyOnFailure  bool           `json:"notifyOnFailure"`
 }
 
 type AutoUpdateStore struct {
@@ -209,14 +209,90 @@ type AutoRunFailure struct {
 }
 
 type AutoUpdateRunResult struct {
-	Time          string          `json:"time"`
-	Trigger       string          `json:"trigger"` // auto | manual | group
-	Updated       []string        `json:"updated"`
+	Time          string           `json:"time"`
+	Trigger       string           `json:"trigger"` // auto | manual | group
+	Updated       []string         `json:"updated"`
 	Failed        []AutoRunFailure `json:"failed"`
-	CleanedImages int             `json:"cleanedImages"`
-	Snapshots     []string        `json:"snapshots,omitempty"` // 本次打下的快照引用
-	DurationSec   float64         `json:"durationSec"`
-	Note          string          `json:"note,omitempty"`
+	CleanedImages int              `json:"cleanedImages"`
+	Snapshots     []string         `json:"snapshots,omitempty"` // 本次打下的快照引用
+	DurationSec   float64          `json:"durationSec"`
+	Note          string           `json:"note,omitempty"`
+}
+
+// CheckState 更新检查的运行状态（服务端持有，前端切页面不丢）
+type CheckState struct {
+	mu           sync.Mutex
+	Running      bool
+	TaskID       string
+	Checked      int
+	Total        int
+	Trigger      string // manual | cron | startup
+	NeedUpdate   int
+	LastCheckAt  time.Time
+	LastDuration float64 // 秒
+	LastChecked  int     // 上次检查的镜像数（用于估算耗时）
+}
+
+func NewCheckState() *CheckState { return &CheckState{} }
+
+func (c *CheckState) TryStart(taskID string, total int, trigger string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.Running {
+		return false
+	}
+	c.Running = true
+	c.TaskID = taskID
+	c.Checked = 0
+	c.Total = total
+	c.Trigger = trigger
+	c.NeedUpdate = 0
+	return true
+}
+
+func (c *CheckState) Progress(checked, needUpdate int) {
+	c.mu.Lock()
+	c.Checked = checked
+	c.NeedUpdate = needUpdate
+	c.mu.Unlock()
+}
+
+func (c *CheckState) Finish(checked, need int, d time.Duration) {
+	c.mu.Lock()
+	c.Running = false
+	c.Checked = checked
+	c.NeedUpdate = need
+	c.LastChecked = checked
+	c.LastDuration = d.Seconds()
+	c.LastCheckAt = time.Now()
+	c.mu.Unlock()
+}
+
+// Snapshot 供 API 读取；EstimatedSeconds 为按上次实测推算的本轮预计耗时
+func (c *CheckState) Snapshot() map[string]interface{} {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	est := 0.0
+	if c.LastChecked > 0 && c.LastDuration > 0 {
+		est = c.LastDuration // 上次实测值（同一台机器镜像数变化不大）
+	} else if c.Total > 0 {
+		est = float64(c.Total) * 0.4 // 冷启动经验值：并发 6 时每个镜像约 0.4s
+	}
+	lastAt := ""
+	if !c.LastCheckAt.IsZero() {
+		lastAt = c.LastCheckAt.Format("2006-01-02 15:04")
+	}
+	return map[string]interface{}{
+		"running":          c.Running,
+		"trigger":          c.Trigger,
+		"checked":          c.Checked,
+		"total":            c.Total,
+		"needUpdate":       c.NeedUpdate,
+		"lastCheckAt":      lastAt,
+		"lastDurationSec":  c.LastDuration,
+		"lastChecked":      c.LastChecked,
+		"estimatedSeconds": int(est + 0.5),
+	}
 }
 
 type ContainerAutoStatus struct {

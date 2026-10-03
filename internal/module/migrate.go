@@ -24,9 +24,9 @@ type ImageTransportRecord struct {
 
 // ManifestImage 包内镜像清单
 type ManifestImage struct {
-	ID         string                 `json:"id"`             // sha256:...
-	Refs       []string               `json:"refs"`           // 导出时的本地 tag 列表
-	Source     string                 `json:"source"`         // registry | local-build | dangling
+	ID         string                 `json:"id"`     // sha256:...
+	Refs       []string               `json:"refs"`   // 导出时的本地 tag 列表
+	Source     string                 `json:"source"` // registry | local-build | dangling
 	Size       int64                  `json:"size"`
 	Transports []ImageTransportRecord `json:"transports,omitempty"`
 }
@@ -41,15 +41,15 @@ type ManifestVolume struct {
 
 // ManifestContainer 包内容器配方（创建配置原样保留，保证精确重建）
 type ManifestContainer struct {
-	Name       string            `json:"name"`
-	ImageRef   string            `json:"imageRef"`
-	ImageID    string            `json:"imageId"`
-	WasRunning bool              `json:"wasRunning"`
-	Create     json.RawMessage   `json:"create"` // dockerBackend.ContainerCreateConfig（可含 env，按需脱敏）
-	Volumes    []ManifestVolume  `json:"volumes"`
-	Networks   []string          `json:"networks"`
-	Ports      []string          `json:"ports"` // 形如 "0.0.0.0:8080->80/tcp"
-	Privileged bool              `json:"privileged"`
+	Name       string           `json:"name"`
+	ImageRef   string           `json:"imageRef"`
+	ImageID    string           `json:"imageId"`
+	WasRunning bool             `json:"wasRunning"`
+	Create     json.RawMessage  `json:"create"` // dockerBackend.ContainerCreateConfig（可含 env，按需脱敏）
+	Volumes    []ManifestVolume `json:"volumes"`
+	Networks   []string         `json:"networks"`
+	Ports      []string         `json:"ports"` // 形如 "0.0.0.0:8080->80/tcp"
+	Privileged bool             `json:"privileged"`
 }
 
 // ManifestGenerator 生成信息
@@ -94,21 +94,21 @@ type ImportPlanItem struct {
 
 // ImportPlan 导入预检结果
 type ImportPlan struct {
-	File        string           `json:"file"`
-	PackageName string           `json:"packageName"`
+	File        string            `json:"file"`
+	PackageName string            `json:"packageName"`
 	Generator   ManifestGenerator `json:"generator"`
-	Items       []ImportPlanItem `json:"items"`
-	TotalSize   int64            `json:"totalSize"`
-	DiskFree    int64            `json:"diskFree"`
-	Warnings    []string         `json:"warnings,omitempty"`
+	Items       []ImportPlanItem  `json:"items"`
+	TotalSize   int64             `json:"totalSize"`
+	DiskFree    int64             `json:"diskFree"`
+	Warnings    []string          `json:"warnings,omitempty"`
 }
 
 // ImportItemOverride 导入执行时对单个容器的覆盖
 type ImportItemOverride struct {
-	Name      string            `json:"name"`      // 原始名（匹配用）
-	Skip      bool              `json:"skip"`      // 跳过此项
-	NewName   string            `json:"newName"`   // 改名（空=原名）
-	PortMap   map[string]string `json:"portMap"`   // 宿主端口重映射 "8080"→"18080"
-	MountMap  map[string]string `json:"mountMap"`  // 宿主路径重映射 /old→/new
-	AutoCreateDirs bool         `json:"autoCreateDirs"` // 缺失宿主目录是否自动创建
+	Name           string            `json:"name"`           // 原始名（匹配用）
+	Skip           bool              `json:"skip"`           // 跳过此项
+	NewName        string            `json:"newName"`        // 改名（空=原名）
+	PortMap        map[string]string `json:"portMap"`        // 宿主端口重映射 "8080"→"18080"
+	MountMap       map[string]string `json:"mountMap"`       // 宿主路径重映射 /old→/new
+	AutoCreateDirs bool              `json:"autoCreateDirs"` // 缺失宿主目录是否自动创建
 }

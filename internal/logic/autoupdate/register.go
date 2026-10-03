@@ -5,8 +5,8 @@ import (
 
 	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/libremk66/DockHamster/internal/utiles"
-	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/robfig/cron/v3"
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 // RegisterCrons 按当前设置注册/重注册两条定时任务（UI 改 cron 后调用）：
@@ -42,7 +42,7 @@ func RegisterCrons(svcCtx *svc.ServiceContext) error {
 		svcCtx.CheckCronID = 0
 	}
 	id2, err := svcCtx.CronEngine.AddFunc(settings.CheckCron, func() {
-		if _, _, cerr := utiles.CheckAllImageUpdates(svcCtx); cerr != nil {
+		if _, _, cerr := utiles.CheckAllImageUpdates(svcCtx, "cron"); cerr != nil {
 			logx.Errorf("定时检查更新失败: %v", cerr)
 		}
 	})

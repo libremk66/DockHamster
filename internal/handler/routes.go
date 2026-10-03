@@ -8,12 +8,12 @@ import (
 
 	auth "github.com/libremk66/DockHamster/internal/handler/auth"
 	autoupdate "github.com/libremk66/DockHamster/internal/handler/autoupdate"
-	snapshot "github.com/libremk66/DockHamster/internal/handler/snapshot"
-	migrate "github.com/libremk66/DockHamster/internal/handler/migrate"
 	container "github.com/libremk66/DockHamster/internal/handler/container"
 	icons "github.com/libremk66/DockHamster/internal/handler/icons"
 	image "github.com/libremk66/DockHamster/internal/handler/image"
+	migrate "github.com/libremk66/DockHamster/internal/handler/migrate"
 	progress "github.com/libremk66/DockHamster/internal/handler/progress"
+	snapshot "github.com/libremk66/DockHamster/internal/handler/snapshot"
 	version "github.com/libremk66/DockHamster/internal/handler/version"
 	"github.com/libremk66/DockHamster/internal/svc"
 
@@ -171,6 +171,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Method:  http.MethodPost,
 				Path:    "/autoUpdate/check",
 				Handler: autoupdate.CheckNowHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/autoUpdate/check/status",
+				Handler: autoupdate.CheckStatusHandler(serverCtx),
 			},
 			{
 				Method:  http.MethodGet,

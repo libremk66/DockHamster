@@ -83,7 +83,7 @@ export const customImageLogos = {
 
 	// 启动时先查一遍（之后由"检查更新 cron"按设置频率接管）
 	go func() {
-		if _, _, cerr := utiles.CheckAllImageUpdates(ctx); cerr != nil {
+		if _, _, cerr := utiles.CheckAllImageUpdates(ctx, "startup"); cerr != nil {
 			logx.Errorf("启动检查更新失败: %v", cerr)
 		}
 	}()

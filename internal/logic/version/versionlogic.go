@@ -52,10 +52,10 @@ func (l *VersionLogic) Version(req *types.VersionReq) (resp *types.Resp, err err
 			resp.Code = 200
 			resp.Msg = "程序有更新"
 			resp.Data = map[string]interface{}{
-				"remoteVersion":   remoteVersion,
-				"imageUpdate":     imageUpdate,
-				"remoteImageTag":  "latest",
-				"remoteDigest":    imageRemoteDigest,
+				"remoteVersion":  remoteVersion,
+				"imageUpdate":    imageUpdate,
+				"remoteImageTag": "latest",
+				"remoteDigest":   imageRemoteDigest,
 			}
 			return resp, nil
 		}
@@ -63,9 +63,9 @@ func (l *VersionLogic) Version(req *types.VersionReq) (resp *types.Resp, err err
 			resp.Code = 200
 			resp.Msg = "镜像有更新"
 			resp.Data = map[string]interface{}{
-				"remoteVersion":  remoteVersion,
-				"imageUpdate":    true,
-				"remoteDigest":   imageRemoteDigest,
+				"remoteVersion": remoteVersion,
+				"imageUpdate":   true,
+				"remoteDigest":  imageRemoteDigest,
 			}
 			return resp, nil
 		}
