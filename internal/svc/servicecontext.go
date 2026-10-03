@@ -26,6 +26,7 @@ type ServiceContext struct {
 	AutoUpdateState  *module.AutoUpdateState
 	CronEngine       *cron.Cron
 	AutoUpdateCronID cron.EntryID
+	CheckCronID      cron.EntryID
 	CronMu           sync.Mutex
 	mu               sync.Mutex
 }

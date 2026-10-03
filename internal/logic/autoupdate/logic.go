@@ -2,6 +2,7 @@ package autoupdate
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/libremk66/DockHamster/internal/module"
@@ -37,9 +38,17 @@ func (l *AutoUpdateLogic) SaveSettings(req *module.AutoUpdateSettings) (*types.R
 	resp := &types.Resp{}
 	if err := ValidateCron(req.Cron); err != nil {
 		resp.Code = 400
-		resp.Msg = "cron 表达式无效：" + err.Error()
+		resp.Msg = "自动更新计划无效：" + err.Error()
 		resp.Data = map[string]interface{}{}
 		return resp, nil
+	}
+	if strings.TrimSpace(req.CheckCron) != "" {
+		if err := ValidateCron(req.CheckCron); err != nil {
+			resp.Code = 400
+			resp.Msg = "检查更新计划无效：" + err.Error()
+			resp.Data = map[string]interface{}{}
+			return resp, nil
+		}
 	}
 	if err := l.svcCtx.AutoUpdate.Save(*req); err != nil {
 		resp.Code = 500
@@ -47,7 +56,7 @@ func (l *AutoUpdateLogic) SaveSettings(req *module.AutoUpdateSettings) (*types.R
 		resp.Data = map[string]interface{}{}
 		return resp, nil
 	}
-	if err := RegisterAutoUpdateCron(l.svcCtx); err != nil {
+	if err := RegisterCrons(l.svcCtx); err != nil {
 		resp.Code = 500
 		resp.Msg = "定时任务注册失败：" + err.Error()
 		resp.Data = map[string]interface{}{}
@@ -56,6 +65,26 @@ func (l *AutoUpdateLogic) SaveSettings(req *module.AutoUpdateSettings) (*types.R
 	resp.Code = 200
 	resp.Msg = "success"
 	resp.Data = l.svcCtx.AutoUpdate.Get()
+	return resp, nil
+}
+
+// CheckNow 立即检查一轮镜像更新（同步执行，供 UI「检查更新」按钮）
+func (l *AutoUpdateLogic) CheckNow() (resp *types.Resp, err error) {
+	resp = &types.Resp{}
+	checked, need, cerr := utiles.CheckAllImageUpdates(l.svcCtx)
+	if cerr != nil {
+		resp.Code = 500
+		resp.Msg = "检查失败: " + cerr.Error()
+		resp.Data = map[string]interface{}{}
+		return resp, nil
+	}
+	resp.Code = 200
+	if need > 0 {
+		resp.Msg = fmt.Sprintf("已检查 %d 个镜像，发现 %d 个有新版本", checked, need)
+	} else {
+		resp.Msg = fmt.Sprintf("已检查 %d 个镜像，全部已是最新", checked)
+	}
+	resp.Data = map[string]interface{}{"checked": checked, "needUpdate": need}
 	return resp, nil
 }
 

@@ -168,6 +168,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Handler: autoupdate.RunHandler(serverCtx),
 			},
 			{
+				Method:  http.MethodPost,
+				Path:    "/autoUpdate/check",
+				Handler: autoupdate.CheckNowHandler(serverCtx),
+			},
+			{
 				Method:  http.MethodGet,
 				Path:    "/autoUpdate/status",
 				Handler: autoupdate.StatusHandler(serverCtx),

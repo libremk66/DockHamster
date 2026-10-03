@@ -18,6 +18,8 @@ type AutoUpdateSettings struct {
 	Containers      []string       `json:"containers"`
 	Exclude         []string       `json:"exclude"`
 	Cron            string         `json:"cron"`
+	// 更新检查频率（只读探测 registry，不影响容器）；默认每小时 30 分
+	CheckCron string `json:"checkCron,optional"`
 	DeleteOldImage  bool           `json:"deleteOldImage"` // 兼容旧配置：true=清理；新字段 OldImagePolicy 优先
 	// 旧镜像处置策略（全局默认）：clean=安全清理 / snapshot=打快照保留 / keep=不处理
 	OldImagePolicy string `json:"oldImagePolicy,optional"`
@@ -130,6 +132,9 @@ func (s *AutoUpdateSettings) normalizePolicies() {
 	if strings.TrimSpace(s.SnapshotTemplate) == "" {
 		s.SnapshotTemplate = "{name}:{date}-{time}"
 	}
+	if strings.TrimSpace(s.CheckCron) == "" {
+		s.CheckCron = "30 * * * *"
+	}
 	if s.ContainerPolicy == nil {
 		s.ContainerPolicy = map[string]string{}
 	}
@@ -172,6 +177,9 @@ func defaultAutoSettings() AutoUpdateSettings {
 	}
 	if v := strings.TrimSpace(os.Getenv("AutoUpdateCron")); v != "" {
 		se.Cron = v
+	}
+	if v := strings.TrimSpace(os.Getenv("AutoUpdateCheckCron")); v != "" {
+		se.CheckCron = v
 	}
 	if os.Getenv("DeleteOldImage") == "false" {
 		se.DeleteOldImage = false

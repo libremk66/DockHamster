@@ -81,31 +81,19 @@ export const customImageLogos = {
 		}
 	}
 
-	list, err := utiles.GetImagesList(ctx)
-	if err != nil {
-		logx.Errorf("panic获取镜像列表出错: %v", err)
-		panic(err)
-	}
-	go ctx.HubImageInfo.CheckUpdate(ctx.DockerClient, list)
+	// 启动时先查一遍（之后由"检查更新 cron"按设置频率接管）
+	go func() {
+		if _, _, cerr := utiles.CheckAllImageUpdates(ctx); cerr != nil {
+			logx.Errorf("启动检查更新失败: %v", cerr)
+		}
+	}()
 	corndanmu := cron.New(cron.WithParser(cron.NewParser(
 		cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
 	)))
-	_, err = corndanmu.AddFunc("30 * * * *", func() {
-		list, err := utiles.GetImagesList(ctx)
-		if err != nil {
-			logx.Errorf("panic获取镜像列表出错: %v", err)
-			panic(err)
-		}
-		ctx.HubImageInfo.CheckUpdate(ctx.DockerClient, list)
-	})
-	if err != nil {
-		logx.Errorf("panic添加定时任务出错: %v", err)
-		panic(err)
-	}
 	// 自动更新调度：注册到 cron 引擎（设置由 UI 持久化，改 cron 会重注册）
 	ctx.CronEngine = corndanmu
 	corndanmu.Start()
-	if err := autoupdate.RegisterAutoUpdateCron(ctx); err != nil {
+	if err := autoupdate.RegisterCrons(ctx); err != nil {
 		logx.Errorf("自动更新定时任务注册失败(检查 cron 表达式): %v", err)
 	} else {
 		logx.Info("自动更新任务已注册，调度: " + ctx.AutoUpdate.Get().Cron)
