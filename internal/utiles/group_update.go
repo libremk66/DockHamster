@@ -68,8 +68,16 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 		tasks = append(tasks, GroupUpdateTask{ID: t.id, Name: t.name, TaskID: uuid.New().String()})
 	}
 
+	// 登记为"进行中"，供 status 接口实时展示
+	active := make([]module.ActiveTask, 0, len(tasks))
+	for _, t := range tasks {
+		active = append(active, module.ActiveTask{Name: t.Name, TaskID: t.TaskID})
+	}
+	serviceContext.AutoUpdateState.SetActive(active)
+
 	go func() {
 		defer serviceContext.AutoUpdateState.Finish()
+		defer serviceContext.AutoUpdateState.ClearActive()
 		start := time.Now()
 		result := module.AutoUpdateRunResult{
 			Time:    time.Now().Format("2006-01-02 15:04:05"),
