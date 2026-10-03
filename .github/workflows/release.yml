@@ -1,7 +1,7 @@
 name: release
 
-# version 文件变化 → 自动打 tag + 建 Release（含自动生成的变更日志）
-# 与 build.yml 配套：同一个 version 文件同时驱动"镜像构建"和本发布流程，三处版本号永远一致
+# version 文件变化 → 自动打 tag + 建 Release（变更日志从 git 提交生成，含前端仓库）
+# 与 build.yml 配套：同一个 version 文件同时驱动"镜像构建"和本发布流程
 on:
   push:
     branches:
@@ -9,6 +9,11 @@ on:
     paths:
       - version
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只生成变更日志预览，不创建 Release'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -17,25 +22,47 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout backend
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Read version
-        id: v
-        run: echo "version=$(cat version)" >> "$GITHUB_OUTPUT"
+      - name: Checkout frontend (用于收集界面改动)
+        uses: actions/checkout@v4
+        with:
+          repository: libremk66/DockHamster-UI
+          path: ui
+          fetch-depth: 0
 
-      - name: Create release (skip if exists)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build notes
         run: |
           set -eu
-          V="${{ steps.v.outputs.version }}"
-          if gh release view "$V" >/dev/null 2>&1; then
-            echo "Release $V 已存在，跳过"
-            exit 0
+          V="$(cat version)"
+          PREV="$(git tag --sort=-creatordate | grep -vx "$V" | head -1 || true)"
+
+          if [ -n "$PREV" ]; then
+            PREV_DATE="$(git log -1 --format=%cI "$PREV")"
+            BK_LOG="$(git log --no-merges --pretty=format:'%s' "$PREV..HEAD" | grep -v '^chore: 版本' || true)"
+            UI_LOG="$(git -C ui log --no-merges --since="$PREV_DATE" --pretty=format:'%s' || true)"
+          else
+            BK_LOG="$(git log --no-merges --pretty=format:'%s' | grep -v '^chore: 版本' || true)"
+            UI_LOG="$(git -C ui log --no-merges --pretty=format:'%s' || true)"
           fi
+          echo "上一个发布: ${PREV:-（无，首次发布）}"
+
+          clean() {
+            sed -E 's/ \[(skip ci|ci skip|skip actions)\]//g' \
+            | sed -E 's/；版本 v[0-9]+\.[0-9]+\.[0-9]+$//' \
+            | sed -E 's/[[:space:]]+$//'
+          }
+          emit() {
+            title="$1"; pat="$2"; log="$3"
+            out="$(printf '%s\n' "$log" | grep -E "$pat" | sed -E 's/^(feat|fix|perf|docs|chore|refactor|test|style|assets)(\([^)]*\))?: /- /' | clean || true)"
+            if [ -n "$out" ]; then
+              { echo "### $title"; echo ""; printf '%s\n' "$out"; echo ""; }
+            fi
+          }
+
           {
             echo "🐹 **DockHamster 容器仓鼠 $V**"
             echo ""
@@ -49,6 +76,36 @@ jobs:
             echo "---"
             echo ""
             echo "## 本次变更"
+            echo ""
+            emit "✨ 新功能" '^feat' "$BK_LOG"
+            emit "🐛 修复与优化" '^(fix|perf)' "$BK_LOG"
+            emit "🖥️ 界面（前端）" '.' "$UI_LOG"
+            emit "🔧 其它" '^(docs|chore|refactor|test|style)' "$BK_LOG"
+            if [ -n "$PREV" ]; then
+              echo "**Full Changelog**: https://github.com/libremk66/DockHamster/compare/${PREV}...${V}"
+            else
+              echo "**全部版本**: https://github.com/libremk66/DockHamster/releases"
+            fi
           } > /tmp/notes.md
-          gh release create "$V" --title "$V" --generate-notes --notes-file /tmp/notes.md
+
+          echo "========== 生成的变更日志 =========="
+          cat /tmp/notes.md
+          echo "===================================="
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -eu
+          V="$(cat version)"
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            echo "dry-run 模式：不创建 Release（上面是日志预览）"
+            exit 0
+          fi
+          if gh release view "$V" >/dev/null 2>&1; then
+            echo "Release $V 已存在，跳过"
+            exit 0
+          fi
+          gh release create "$V" --title "$V" --notes-file /tmp/notes.md
           echo "已创建 Release $V"
