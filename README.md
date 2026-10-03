@@ -1,14 +1,9 @@
 # 🐹 DockHamster · 容器仓鼠
 
-
-
-
 <p align="center"><img src="docs/logo.png" width="112" alt="DockHamster"></p>
 
-> **Docker 容器管理面板 · 社区增强版**
+> **Docker 容器管理面板 · 增强版**
 > 基于 [onlyLTY/dockerCopilot](https://github.com/onlyLTY/dockerCopilot)（AGPL-3.0）二次开发，专注"省心的容器运维"：自动更新、旧镜像清理、整组更新、多渠道通知、实时进度、列表化界面。
-
-🐳 镜像：`libremk66/dockhamster` ｜ 📦 后端源码：本仓库 ｜ 🎨 前端：[libremk66/DockHamster-UI](https://github.com/libremk66/DockHamster-UI) ｜ 📖 功能详解：[FEATURES.md](./FEATURES.md)
 
 ## 目录
 
@@ -19,6 +14,7 @@
 - [五、自动更新怎么用](#五自动更新怎么用)
 - [六、上游与致谢](#六上游与致谢)
 - [七、许可](#七许可)
+- [📖 功能详解 · FEATURES.md](./FEATURES.md)
 
 ## 一、它是什么
 
