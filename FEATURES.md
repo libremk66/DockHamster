@@ -199,18 +199,33 @@ internal/types/types.go / svc / dockercopilot.go  小改
 前端（[libremk66/DockHamster-UI](https://github.com/libremk66/DockHamster-UI)）：
 `src/components/AutoUpdate.jsx`（新增页面：白名单/通知/进度/旧镜像策略）、`Containers.jsx`（列表化/搜索/开关/整组弹窗/进度子行/回滚入口）、`Images.jsx`（列表化/搜索/快照分类）、`Migrate.jsx`（迁移页：体检/导出/导入）、`ProgressBar.jsx`、`Header.jsx`、`App.jsx`、`api/client.js`。
 
-## 五、与上游的关系
+## 五、版本与发布机制
+
+**版本号三处一致**：仓库根目录的 `version` 文件是唯一事实来源（如 `v1.3.0`），一次提交同时驱动三件事：
+
+1. **镜像构建**：`build.yml` 构建并推送 `libremk66/dockhamster:latest` + `:v1.3.0`（多架构）
+2. **GitHub Release**：`release.yml` 自动打 tag、创建 Release 并生成变更日志（发版零手工步骤）
+3. **面板内的更新提示**：面板读取同一个 `version` 文件来判断是否有新版
+
+**面板怎么知道有新版本**（双保险，任一命中即提示）：
+
+- **版本号比较**：拉取仓库 main 分支的 `version` 文件（**多源自动兜底**：GitHub raw → jsDelivr CDN → 公共镜像站，每源 6 秒超时、10 分钟缓存、记住上次可用的源）——**无需任何代理配置**
+- **镜像 digest 比对**：直接问镜像仓库"`libremk66/dockhamster:latest` 的 digest 变了没"（复用容器更新检测的同一套逻辑）——防止某次提交忘了改版本号，用户仍能收到提示
+
+**更新方式**（Docker 部署）：容器页找到 `dockhamster` 容器点「更新」，或 `docker compose pull && docker compose up -d`。面板不做"自己更新自己"（避免更新过程中断），侧栏的「有新版本」按钮会直接给出这两种方式。
+
+## 六、与上游的关系
 
 本项目为独立维护的社区增强版：**不再自动 rebase 上游**，但保留了完整的 git 历史与出处标注（AGPL 要求）；上游修复会按需 cherry-pick。
 
 通用修复建议持续向上游提 PR；一旦合并，对应实现即可与上游对齐。
 
-## 六、构建与发布
+## 七、构建与发布
 
 - 推送 `main` 分支 → GitHub Actions（`build.yml`）自动构建 amd64/arm64 并推送：
   `libremk66/dockhamster:latest`（同时打 `:vX.Y.Z` 版本 tag）
 - 需要仓库 Secrets：`DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`
 
-## 七、许可
+## 八、许可
 
 遵循 **AGPL-3.0**（与上游一致）。完整源码即本仓库（`main` 分支），AGPL §13 合规。版权归属：上游原作者 + 本项目贡献者。
