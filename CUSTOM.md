@@ -34,10 +34,14 @@
 - 每个容器保持各自原有运行/停止状态
 - 旧镜像清理遵循引用计数保护，最后一个使用者更新完成后才真正删除
 
-### 4. 飞书通知
+### 4. 多渠道通知（7 个渠道）
 
 - 更新流程结束后发送简报（有内容才发）：成功清单、失败原因、清理旧镜像数、耗时
-- 「自动更新」页配置 Webhook + 两个开关（成功发送 / 失败发送）+ 一键测试发送
+- 渠道：**飞书 / 企业微信 / 钉钉 / Bark / Server酱 / Telegram / 自定义 Webhook**
+  - 飞书、钉钉支持「加签」密钥；企业微信自动按 2048 字节截断
+  - Telegram 可自填 API 反代地址；自定义 Webhook 支持 GET/POST、自定义请求头与 body 模板（`{title}` `{text}` 变量）
+- 「自动更新」页逐渠道勾选启用、每渠道**独立测试发送**（用当前表单值直接发，无需先保存）
+- 两个总开关：更新成功时发送 / 出现失败时发送
 - 简报示例：
   ```
   🔄 DockerCopilot 自动更新 2026-10-03 04:00
@@ -66,7 +70,7 @@
 | `AutoUpdateExclude` | 空 | 排除名单初始值，逗号分隔；优先级高于白名单 |
 | `AutoUpdateCron` | `0 4 * * *` | cron 表达式初始值 |
 | `DeleteOldImage` | `true` | 旧镜像清理初始开关（`false` 关闭） |
-| `FeishuWebhook` | 空 | 飞书 Webhook 初始值 |
+| `FeishuWebhook` | 空 | 飞书 Webhook 初始值（写入 notify.feishu） |
 | `AutoUpdateConfigFile` | `/data/config/autoUpdate.json` | 配置文件路径覆盖 |
 | `DelOldContainer` | `true` | 既有变量：更新后是否删除旧容器（`false` 保留改名后的旧容器） |
 
@@ -78,14 +82,14 @@
 | POST | `/api/autoUpdate/settings` | 保存设置（会校验 cron 并重注册定时任务） |
 | POST | `/api/autoUpdate/run` | 立即运行一轮（异步） |
 | GET | `/api/autoUpdate/status` | 运行状态 + 最近 30 次记录 + 每容器最近结果 |
-| POST | `/api/autoUpdate/testNotify` | 发送飞书测试消息（可临时覆盖 webhook） |
+| POST | `/api/autoUpdate/testNotify` | 渠道测试发送（`{channel, config}`；config 为前端当前表单值） |
 | POST | `/api/container/:id/updateGroup` | 整组更新（更新与该容器共用同一镜像的所有容器，返回各容器任务 ID） |
 
 ## 四、代码位置（定制改动集中在）
 
 ```
 internal/module/autosettings.go    新增：设置存储 + 运行状态
-internal/module/feishu.go          新增：飞书发送
+internal/module/notify.go          新增：多渠道通知发送（7 渠道）
 internal/utiles/auto_update.go     新增：白名单自动更新（批量、按镜像分组）
 internal/utiles/group_update.go    新增：整组更新
 internal/utiles/cleanup.go         新增：旧镜像安全清理
