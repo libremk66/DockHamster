@@ -101,6 +101,19 @@ export const customImageLogos = {
 		logx.Errorf("panic添加定时任务出错: %v", err)
 		panic(err)
 	}
+	// 自动更新（白名单模式）：AutoUpdateContainers 配置后才生效
+	autoUpdateCron := os.Getenv("AutoUpdateCron")
+	if autoUpdateCron == "" {
+		autoUpdateCron = "0 4 * * *"
+	}
+	_, err = corndanmu.AddFunc(autoUpdateCron, func() {
+		utiles.RunAutoUpdate(ctx)
+	})
+	if err != nil {
+		logx.Errorf("自动更新定时任务添加失败(检查AutoUpdateCron表达式): %v", err)
+	} else {
+		logx.Info("自动更新任务已注册，调度: " + autoUpdateCron)
+	}
 	corndanmu.Start()
 	defer corndanmu.Stop()
 	httpx.SetErrorHandler(func(err error) (int, any) {
