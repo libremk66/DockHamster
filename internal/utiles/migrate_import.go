@@ -11,10 +11,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	dockerBackend "github.com/docker/docker/api/types/backend"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
-	dockerBackend "github.com/docker/docker/api/types/backend"
 	"github.com/libremk66/DockHamster/internal/module"
 	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -122,18 +122,29 @@ func BuildImportPlan(svcCtx *svc.ServiceContext, pkgPath, pkgName string) (*modu
 
 	for _, c := range m.Containers {
 		item := module.ImportPlanItem{
-			Name:          c.Name,
-			ImageRef:      c.ImageRef,
-			ImageID:       c.ImageID,
-			Privileged:    c.Privileged,
-			WasRunning:    c.WasRunning,
-			MountSuggest:  map[string]string{},
+			Name:         c.Name,
+			ImageRef:     c.ImageRef,
+			ImageID:      c.ImageID,
+			Privileged:   c.Privileged,
+			WasRunning:   c.WasRunning,
+			MountSuggest: map[string]string{},
 		}
 		// 镜像可得性
 		switch {
 		case localByID[c.ImageID] || localByRef[c.ImageRef]:
 			item.ImageSource = "local"
-		case func() bool { mi, ok := pkgImageByID[c.ImageID]; if !ok { return false }; for _, tr := range mi.Transports { if tr.Type == "archive" { return true } }; return false }():
+		case func() bool {
+			mi, ok := pkgImageByID[c.ImageID]
+			if !ok {
+				return false
+			}
+			for _, tr := range mi.Transports {
+				if tr.Type == "archive" {
+					return true
+				}
+			}
+			return false
+		}():
 			item.ImageSource = "package"
 		case func() bool { mi, ok := pkgImageByID[c.ImageID]; return ok && mi.Source == "registry" }():
 			item.ImageSource = "registry"

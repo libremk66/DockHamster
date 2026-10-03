@@ -24,6 +24,7 @@ type ServiceContext struct {
 	// 自动更新（UI 配）
 	AutoUpdate       *module.AutoUpdateStore
 	AutoUpdateState  *module.AutoUpdateState
+	AutoUpdateCheck  *module.CheckState
 	CronEngine       *cron.Cron
 	AutoUpdateCronID cron.EntryID
 	CheckCronID      cron.EntryID
@@ -54,6 +55,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		DockerClient:    cli,
 		AutoUpdate:      module.NewAutoUpdateStore(),
 		AutoUpdateState: module.NewAutoUpdateState(),
+		AutoUpdateCheck: module.NewCheckState(),
 	}
 }
 

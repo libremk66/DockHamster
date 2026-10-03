@@ -2,8 +2,8 @@ package autoupdate
 
 import (
 	"context"
-	"fmt"
 	"strings"
+	"time"
 
 	"github.com/libremk66/DockHamster/internal/module"
 	"github.com/libremk66/DockHamster/internal/svc"
@@ -68,23 +68,42 @@ func (l *AutoUpdateLogic) SaveSettings(req *module.AutoUpdateSettings) (*types.R
 	return resp, nil
 }
 
-// CheckNow 立即检查一轮镜像更新（同步执行，供 UI「检查更新」按钮）
+// CheckNow 立即检查一轮镜像更新（异步：立刻返回，前端轮询 CheckStatus 看进度）
 func (l *AutoUpdateLogic) CheckNow() (resp *types.Resp, err error) {
 	resp = &types.Resp{}
-	checked, need, cerr := utiles.CheckAllImageUpdates(l.svcCtx)
-	if cerr != nil {
-		resp.Code = 500
-		resp.Msg = "检查失败: " + cerr.Error()
-		resp.Data = map[string]interface{}{}
+	if l.svcCtx.AutoUpdateCheck.Snapshot()["running"] == true {
+		resp.Code = 409
+		resp.Msg = "已有检查在进行中"
+		resp.Data = l.svcCtx.AutoUpdateCheck.Snapshot()
 		return resp, nil
 	}
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				l.Errorf("检查更新 panic: %v", r)
+				l.svcCtx.AutoUpdateCheck.Finish(0, 0, 0)
+			}
+		}()
+		// 状态登记在 CheckAllImageUpdates 内部完成（与 cron/startup 一致）
+		if _, _, cerr := utiles.CheckAllImageUpdates(l.svcCtx, "manual"); cerr != nil {
+			l.Errorf("检查更新失败: %v", cerr)
+		}
+	}()
 	resp.Code = 200
-	if need > 0 {
-		resp.Msg = fmt.Sprintf("已检查 %d 个镜像，发现 %d 个有新版本", checked, need)
-	} else {
-		resp.Msg = fmt.Sprintf("已检查 %d 个镜像，全部已是最新", checked)
-	}
-	resp.Data = map[string]interface{}{"checked": checked, "needUpdate": need}
+	resp.Msg = "已开始检查"
+	resp.Data = l.svcCtx.AutoUpdateCheck.Snapshot()
+	return resp, nil
+}
+
+// CheckStatus 查询更新检查的运行状态与上次结果（前端按钮用它显示进度/上次时间）
+func (l *AutoUpdateLogic) CheckStatus() (resp *types.Resp, err error) {
+	resp = &types.Resp{}
+	data := l.svcCtx.AutoUpdateCheck.Snapshot()
+	_, nextCheck := l.nextRuns()
+	data["nextCheckAt"] = nextCheck
+	resp.Code = 200
+	resp.Msg = "success"
+	resp.Data = data
 	return resp, nil
 }
 
@@ -112,8 +131,28 @@ func (l *AutoUpdateLogic) Run() (*types.Resp, error) {
 }
 
 // Status 运行状态与最近记录（含进行中任务的实时进度）
+// nextRuns 返回两条 cron 的下次运行时间（从调度引擎实际登记的条目读取，最准确）
+func (l *AutoUpdateLogic) nextRuns() (nextAuto, nextCheck string) {
+	if l.svcCtx.CronEngine == nil {
+		return "", ""
+	}
+	now := time.Now()
+	if id := l.svcCtx.AutoUpdateCronID; id != 0 {
+		if e := l.svcCtx.CronEngine.Entry(id); !e.Next.IsZero() && e.Next.After(now) {
+			nextAuto = e.Next.Format("2006-01-02 15:04")
+		}
+	}
+	if id := l.svcCtx.CheckCronID; id != 0 {
+		if e := l.svcCtx.CronEngine.Entry(id); !e.Next.IsZero() && e.Next.After(now) {
+			nextCheck = e.Next.Format("2006-01-02 15:04")
+		}
+	}
+	return
+}
+
 func (l *AutoUpdateLogic) Status() (*types.Resp, error) {
 	running, runs, last, active := l.svcCtx.AutoUpdateState.Snapshot()
+	nextAuto, nextCheck := l.nextRuns()
 	// 进行中任务 + 实时进度快照
 	activeTasks := make([]map[string]interface{}, 0, len(active))
 	for _, t := range active {
@@ -135,6 +174,8 @@ func (l *AutoUpdateLogic) Status() (*types.Resp, error) {
 		"runs":        runs,
 		"lastStatus":  last,
 		"activeTasks": activeTasks,
+		"nextAutoAt":  nextAuto,
+		"nextCheckAt": nextCheck,
 	}
 	return resp, nil
 }
