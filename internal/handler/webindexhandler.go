@@ -3,7 +3,7 @@ package handler
 import (
 	"net/http"
 
-	"github.com/onlyLTY/dockerCopilot/internal/svc"
+	"github.com/libremk66/DockHamster/internal/svc"
 )
 
 func webindexHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {

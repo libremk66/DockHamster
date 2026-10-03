@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onlyLTY/dockerCopilot/internal/config"
-	"github.com/onlyLTY/dockerCopilot/internal/svc"
+	"github.com/libremk66/DockHamster/internal/config"
+	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/zeromicro/go-zero/rest"
 )
 

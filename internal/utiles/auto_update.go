@@ -8,8 +8,8 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/google/uuid"
-	"github.com/onlyLTY/dockerCopilot/internal/module"
-	"github.com/onlyLTY/dockerCopilot/internal/svc"
+	"github.com/libremk66/DockHamster/internal/module"
+	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/zeromicro/go-zero/core/logx"
 	"os"
 )
@@ -77,7 +77,7 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 		}
 		name := strings.TrimPrefix(c.Names[0], "/")
 		lower := strings.ToLower(name)
-		if strings.Contains(strings.ToLower(c.Image), "dockercopilot") {
+		if strings.Contains(strings.ToLower(c.Image), "dockhamster") {
 			continue // 不自动更新 DockCopilot 自身
 		}
 		if exclude[lower] {
@@ -180,7 +180,7 @@ func notifyAutoUpdate(serviceContext *svc.ServiceContext, r module.AutoUpdateRun
 
 // composeAutoUpdateMessage 生成通知标题与正文（正文不含标题行，各渠道自行拼接）
 func composeAutoUpdateMessage(r module.AutoUpdateRunResult) (title, text string) {
-	title = "🔄 DockerCopilot 自动更新 " + r.Time
+	title = "🔄 DockHamster 自动更新 " + r.Time
 	var b strings.Builder
 	if len(r.Updated) > 0 {
 		b.WriteString(fmt.Sprintf("✅ 已更新 %d 个：%s\n", len(r.Updated), strings.Join(r.Updated, "、")))

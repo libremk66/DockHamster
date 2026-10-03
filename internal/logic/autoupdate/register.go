@@ -1,8 +1,8 @@
 package autoupdate
 
 import (
-	"github.com/onlyLTY/dockerCopilot/internal/svc"
-	"github.com/onlyLTY/dockerCopilot/internal/utiles"
+	"github.com/libremk66/DockHamster/internal/svc"
+	"github.com/libremk66/DockHamster/internal/utiles"
 	"github.com/robfig/cron/v3"
 )
 

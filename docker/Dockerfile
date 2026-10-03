@@ -1,17 +1,17 @@
 # 使用 Alpine 作为基础镜像
 FROM alpine
-LABEL authors="onlyLTY"
+LABEL authors="onlyLTY, libremk66"
 WORKDIR /app
 
 ARG TARGETPLATFORM
 
-COPY dc-back/dist/$TARGETPLATFORM/dockerCopilot ./dockerCopilot
+COPY dc-back/dist/$TARGETPLATFORM/dockhamster ./dockhamster
 COPY dc-back/etc/. ./etc
 COPY start.sh ./start.sh
 
 RUN apk add --no-cache tzdata \
     && chmod +x start.sh \
-    && chmod +x dockerCopilot
+    && chmod +x dockhamster
 
 # 设置环境变量
 ENV secretKey="" \

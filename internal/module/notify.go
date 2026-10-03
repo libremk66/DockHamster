@@ -169,7 +169,7 @@ func SendChannel(channelType string, c NotifyChannel, title, text string) Notify
 		if base == "" {
 			base = "https://api.day.app"
 		}
-		body, _ := json.Marshal(map[string]string{"title": title, "body": text, "group": "DockerCopilot"})
+		body, _ := json.Marshal(map[string]string{"title": title, "body": text, "group": "DockHamster"})
 		if err := notifyPost(base+"/"+url.PathEscape(c.Key), map[string]string{"Content-Type": "application/json"}, string(body), http.MethodPost); err != nil {
 			return fail(err.Error())
 		}

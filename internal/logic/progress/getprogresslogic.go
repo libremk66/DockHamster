@@ -3,8 +3,8 @@ package progress
 import (
 	"context"
 
-	"github.com/onlyLTY/dockerCopilot/internal/svc"
-	"github.com/onlyLTY/dockerCopilot/internal/types"
+	"github.com/libremk66/DockHamster/internal/svc"
+	"github.com/libremk66/DockHamster/internal/types"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

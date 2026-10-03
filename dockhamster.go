@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/onlyLTY/dockerCopilot/internal/config"
-	"github.com/onlyLTY/dockerCopilot/internal/handler"
-	"github.com/onlyLTY/dockerCopilot/internal/logic/autoupdate"
-	"github.com/onlyLTY/dockerCopilot/internal/svc"
-	"github.com/onlyLTY/dockerCopilot/internal/utiles"
+	"github.com/libremk66/DockHamster/internal/config"
+	"github.com/libremk66/DockHamster/internal/handler"
+	"github.com/libremk66/DockHamster/internal/logic/autoupdate"
+	"github.com/libremk66/DockHamster/internal/svc"
+	"github.com/libremk66/DockHamster/internal/utiles"
 	"github.com/robfig/cron/v3"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -27,7 +27,7 @@ import (
 //go:embed front/*
 var embeddedFront embed.FS
 
-var configFile = flag.String("f", "etc/dockerCopilot.yaml", "the config file")
+var configFile = flag.String("f", "etc/dockhamster.yaml", "the config file")
 
 type UnauthorizedResponse struct {
 	Code int                    `json:"code"`

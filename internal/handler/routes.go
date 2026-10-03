@@ -6,14 +6,14 @@ package handler
 import (
 	"net/http"
 
-	auth "github.com/onlyLTY/dockerCopilot/internal/handler/auth"
-	autoupdate "github.com/onlyLTY/dockerCopilot/internal/handler/autoupdate"
-	container "github.com/onlyLTY/dockerCopilot/internal/handler/container"
-	icons "github.com/onlyLTY/dockerCopilot/internal/handler/icons"
-	image "github.com/onlyLTY/dockerCopilot/internal/handler/image"
-	progress "github.com/onlyLTY/dockerCopilot/internal/handler/progress"
-	version "github.com/onlyLTY/dockerCopilot/internal/handler/version"
-	"github.com/onlyLTY/dockerCopilot/internal/svc"
+	auth "github.com/libremk66/DockHamster/internal/handler/auth"
+	autoupdate "github.com/libremk66/DockHamster/internal/handler/autoupdate"
+	container "github.com/libremk66/DockHamster/internal/handler/container"
+	icons "github.com/libremk66/DockHamster/internal/handler/icons"
+	image "github.com/libremk66/DockHamster/internal/handler/image"
+	progress "github.com/libremk66/DockHamster/internal/handler/progress"
+	version "github.com/libremk66/DockHamster/internal/handler/version"
+	"github.com/libremk66/DockHamster/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
 )

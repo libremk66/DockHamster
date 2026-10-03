@@ -1,10 +1,10 @@
-name: custom-build-push
+name: build-push
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - custom
+      - main
 
 jobs:
   build-frontend:
@@ -13,9 +13,9 @@ jobs:
       - name: Checkout frontend code
         uses: actions/checkout@v3
         with:
-          repository: libremk66/Docker-Copilot-React
+          repository: libremk66/DockHamster-UI
           path: './frontend'
-          ref: 'custom'
+          ref: 'main'
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -70,7 +70,7 @@ jobs:
 
       - name: Build for ${{ matrix.arch }}
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.arch }} go build -a --trimpath -ldflags="-w -s -X 'github.com/onlyLTY/dockerCopilot/internal/config.Version=${{ env.version }}' -X 'github.com/onlyLTY/dockerCopilot/internal/config.BuildDate=$(date)'" -o dist/linux/${{ matrix.arch }}/dockerCopilot .
+          CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.arch }} go build -a --trimpath -ldflags="-w -s -X 'github.com/libremk66/DockHamster/internal/config.Version=${{ env.version }}' -X 'github.com/libremk66/DockHamster/internal/config.BuildDate=$(date)'" -o dist/linux/${{ matrix.arch }}/dockhamster .
 
       - name: Prepare Files
         run: |
@@ -121,6 +121,6 @@ jobs:
           file: ./docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/dockercopilotme:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/dockercopilotme:${{ env.version }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/dockhamster:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/dockhamster:${{ env.version }}
           push: true

@@ -3,7 +3,7 @@ package utiles
 import (
 	"context"
 	"github.com/docker/docker/api/types/container"
-	"github.com/onlyLTY/dockerCopilot/internal/svc"
+	"github.com/libremk66/DockHamster/internal/svc"
 )
 
 func StopContainer(ctx *svc.ServiceContext, id string) error {
