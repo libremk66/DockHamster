@@ -153,12 +153,19 @@ type ContainerAutoStatus struct {
 	Message string `json:"message"`
 }
 
+// ActiveTask 进行中的更新任务（供 status 接口实时展示进度）
+type ActiveTask struct {
+	Name   string `json:"name"`
+	TaskID string `json:"taskID"`
+}
+
 // AutoUpdateState 自动更新运行状态（内存，最近 30 次记录；重启即清空）
 type AutoUpdateState struct {
 	mu      sync.Mutex
 	running bool
 	runs    []AutoUpdateRunResult
 	last    map[string]ContainerAutoStatus
+	active  []ActiveTask
 }
 
 func NewAutoUpdateState() *AutoUpdateState {
@@ -166,6 +173,20 @@ func NewAutoUpdateState() *AutoUpdateState {
 		runs: []AutoUpdateRunResult{},
 		last: map[string]ContainerAutoStatus{},
 	}
+}
+
+// SetActive 登记本轮进行中的任务（run 开始时调用）
+func (s *AutoUpdateState) SetActive(tasks []ActiveTask) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.active = append([]ActiveTask{}, tasks...)
+}
+
+// ClearActive 清空进行中任务（run 结束）
+func (s *AutoUpdateState) ClearActive() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.active = nil
 }
 
 // TryStart 防并发：已有任务运行中则返回 false
@@ -207,7 +228,7 @@ func (s *AutoUpdateState) SetContainer(name string, ok bool, message string) {
 }
 
 // Snapshot 返回状态快照（并发安全）
-func (s *AutoUpdateState) Snapshot() (bool, []AutoUpdateRunResult, map[string]ContainerAutoStatus) {
+func (s *AutoUpdateState) Snapshot() (bool, []AutoUpdateRunResult, map[string]ContainerAutoStatus, []ActiveTask) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	runs := append([]AutoUpdateRunResult{}, s.runs...)
@@ -215,5 +236,6 @@ func (s *AutoUpdateState) Snapshot() (bool, []AutoUpdateRunResult, map[string]Co
 	for k, v := range s.last {
 		last[k] = v
 	}
-	return s.running, runs, last
+	active := append([]ActiveTask{}, s.active...)
+	return s.running, runs, last, active
 }

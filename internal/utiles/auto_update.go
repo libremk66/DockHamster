@@ -68,7 +68,7 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 	}
 
 	type target struct {
-		id, name, pullRef string
+		id, name, pullRef, taskID string
 	}
 	var targets []target
 	for _, c := range list {
@@ -103,6 +103,15 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 		DeleteOldImage:  settings.DeleteOldImage,
 	}
 
+	// 预生成任务 ID 并登记为"进行中"，供 status 接口实时展示
+	active := make([]module.ActiveTask, 0, len(targets))
+	for i := range targets {
+		targets[i].taskID = uuid.New().String()
+		active = append(active, module.ActiveTask{Name: targets[i].name, TaskID: targets[i].taskID})
+	}
+	serviceContext.AutoUpdateState.SetActive(active)
+	defer serviceContext.AutoUpdateState.ClearActive()
+
 	// 按镜像分组：同一镜像只拉取一次
 	groups := make(map[string][]target)
 	for _, t := range targets {
@@ -119,9 +128,8 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 			continue
 		}
 		for _, t := range group {
-			taskID := uuid.New().String()
 			logx.Infof("自动更新：开始更新容器 %s", t.name)
-			cleaned, err := updateContainerCore(serviceContext, t.id, t.name, pullRef, opts, taskID)
+			cleaned, err := updateContainerCore(serviceContext, t.id, t.name, pullRef, opts, t.taskID)
 			if err != nil {
 				logx.Errorf("自动更新：容器 %s 更新失败：%v", t.name, err)
 				result.Failed = append(result.Failed, module.AutoRunFailure{Name: t.name, Error: oneLine(err.Error())})

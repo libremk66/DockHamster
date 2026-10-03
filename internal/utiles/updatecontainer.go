@@ -11,6 +11,7 @@ import (
 	"github.com/onlyLTY/dockerCopilot/internal/svc"
 	"github.com/zeromicro/go-zero/core/logx"
 	"io"
+	"strings"
 	"time"
 )
 
@@ -51,11 +52,15 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	signal := "SIGINT"
 
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
+	// 心跳：每 2 秒刷新一次耗时，长阶段不会"看起来卡死"
+	hbStop := make(chan struct{})
+	defer close(hbStop)
+	go progressHeartbeat(serviceContext, taskID, hbStop)
 	serviceContext.DockerClient.NegotiateAPIVersion(ctx)
 
 	if !opts.SkipPull {
 		oldTaskProgress.Message = "正在拉取新镜像"
-		oldTaskProgress.Percentage = 10
+		oldTaskProgress.Percentage = 5
 		oldTaskProgress.DetailMsg = "正在拉取新镜像"
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
 		reader, err := serviceContext.DockerClient.ImagePull(ctx, imageNameAndTag, image.PullOptions{})
@@ -94,6 +99,8 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 		oldTaskProgress.Message = "拉取镜像成功"
 		oldTaskProgress.DetailMsg = "拉取镜像成功"
 	}
+	oldTaskProgress.Percentage = 60
+	serviceContext.UpdateProgress(taskID, oldTaskProgress)
 
 	// 停止前先取一次容器信息：保留原始配置、镜像 ID 与运行状态
 	inspectedContainer, err := serviceContext.DockerClient.ContainerInspect(ctx, id)
@@ -108,7 +115,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	oldImageID := inspectedContainer.Image
 	wasRunning := inspectedContainer.State != nil && inspectedContainer.State.Running
 
-	oldTaskProgress.Percentage = 30
+	oldTaskProgress.Percentage = 62
 	oldTaskProgress.Message = "正在停止容器"
 	oldTaskProgress.DetailMsg = "正在停止容器"
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
@@ -127,7 +134,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	oldTaskProgress.Message = "容器停止成功"
 	oldTaskProgress.DetailMsg = "容器停止成功"
 
-	oldTaskProgress.Percentage = 40
+	oldTaskProgress.Percentage = 66
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
 	oldTaskProgress.Message = "正在重命名旧容器"
 	oldTaskProgress.DetailMsg = "正在重命名旧容器"
@@ -143,7 +150,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	}
 	oldTaskProgress.Message = "重命名旧容器成功"
 	oldTaskProgress.DetailMsg = "重命名旧容器成功"
-	oldTaskProgress.Percentage = 60
+	oldTaskProgress.Percentage = 70
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
 	oldTaskProgress.Message = "正在创建新容器"
 	oldTaskProgress.DetailMsg = "正在创建新容器"
@@ -167,7 +174,9 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	}
 	oldTaskProgress.Message = "创建新容器成功"
 	oldTaskProgress.DetailMsg = "创建新容器成功"
-	oldTaskProgress.Percentage = 80
+	oldTaskProgress.Percentage = 75
+	serviceContext.UpdateProgress(taskID, oldTaskProgress)
+	oldTaskProgress.Percentage = 82
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
 	if wasRunning {
 		oldTaskProgress.Message = "正在启动新容器以及删除旧容器(如果不保留旧容器)"
@@ -286,15 +295,59 @@ func decodePullResp(reader io.ReadCloser, ctx *svc.ServiceContext, taskID string
 			return fmt.Errorf("拉取镜像失败: %w", msg.Error)
 		} else {
 			var formattedMsg string
-			if msg.Progress != nil {
-				formattedMsg = fmt.Sprintf("进度%s: %s", msg.Status, msg.Progress.String())
+			if msg.Progress != nil && msg.Progress.Total > 0 {
+				pct := float64(msg.Progress.Current) / float64(msg.Progress.Total) * 100
+				if pct > 100 {
+					pct = 100
+				}
+				// 拉取阶段映射到 5%~60%（拉取通常是大头）
+				oldTaskProgress.Percentage = 5 + int(pct*0.55)
+				formattedMsg = fmt.Sprintf("%s %s / %s（%.0f%%）", msg.Status,
+					humanBytes(msg.Progress.Current), humanBytes(msg.Progress.Total), pct)
 			} else {
-				formattedMsg = fmt.Sprintf("进度%s", msg.Status)
+				formattedMsg = msg.Status
+				if oldTaskProgress.Percentage < 5 {
+					oldTaskProgress.Percentage = 5
+				}
 			}
 			oldTaskProgress.DetailMsg = formattedMsg
-			oldTaskProgress.Percentage = 25
 			ctx.UpdateProgress(taskID, oldTaskProgress)
 			logx.Infof("拉取镜像进度\t %s: %s\n", msg.Status, msg.Progress)
 		}
 	}
+}
+
+// progressHeartbeat 每 2 秒刷新 DetailMsg 的耗时后缀，避免长阶段"看起来卡死"
+func progressHeartbeat(serviceContext *svc.ServiceContext, taskID string, stop <-chan struct{}) {
+	start := time.Now()
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			p, ok := serviceContext.GetProgress(taskID)
+			if !ok || p.IsDone {
+				continue
+			}
+			base := strings.SplitN(p.DetailMsg, " · ⏱", 2)[0]
+			p.DetailMsg = fmt.Sprintf("%s · ⏱%ds", base, int(time.Since(start).Seconds()))
+			serviceContext.UpdateProgress(taskID, p)
+		}
+	}
+}
+
+// humanBytes 人类可读的字节数
+func humanBytes(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%dB", n)
+	}
+	div, exp := int64(unit), 0
+	for m := n / unit; m >= unit; m /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f%sB", float64(n)/float64(div), "KMGT"[exp:exp+1])
 }

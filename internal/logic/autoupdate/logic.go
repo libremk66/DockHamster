@@ -82,14 +82,30 @@ func (l *AutoUpdateLogic) Run() (*types.Resp, error) {
 	return resp, nil
 }
 
-// Status 运行状态与最近记录
+// Status 运行状态与最近记录（含进行中任务的实时进度）
 func (l *AutoUpdateLogic) Status() (*types.Resp, error) {
-	running, runs, last := l.svcCtx.AutoUpdateState.Snapshot()
+	running, runs, last, active := l.svcCtx.AutoUpdateState.Snapshot()
+	// 进行中任务 + 实时进度快照
+	activeTasks := make([]map[string]interface{}, 0, len(active))
+	for _, t := range active {
+		item := map[string]interface{}{
+			"name": t.Name, "taskID": t.TaskID,
+			"percentage": 0, "message": "等待中", "detailMsg": "", "isDone": false,
+		}
+		if p, ok := l.svcCtx.GetProgress(t.TaskID); ok {
+			item["percentage"] = p.Percentage
+			item["message"] = p.Message
+			item["detailMsg"] = p.DetailMsg
+			item["isDone"] = p.IsDone
+		}
+		activeTasks = append(activeTasks, item)
+	}
 	resp := &types.Resp{Code: 200, Msg: "success"}
 	resp.Data = map[string]interface{}{
-		"running":    running,
-		"runs":       runs,
-		"lastStatus": last,
+		"running":     running,
+		"runs":        runs,
+		"lastStatus":  last,
+		"activeTasks": activeTasks,
 	}
 	return resp, nil
 }
