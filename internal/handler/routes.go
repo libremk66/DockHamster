@@ -6,13 +6,16 @@ package handler
 import (
 	"net/http"
 
+	accelerator "github.com/libremk66/DockHamster/internal/handler/accelerator"
 	auth "github.com/libremk66/DockHamster/internal/handler/auth"
 	autoupdate "github.com/libremk66/DockHamster/internal/handler/autoupdate"
 	container "github.com/libremk66/DockHamster/internal/handler/container"
+	favicon "github.com/libremk66/DockHamster/internal/handler/favicon"
 	icons "github.com/libremk66/DockHamster/internal/handler/icons"
 	image "github.com/libremk66/DockHamster/internal/handler/image"
 	migrate "github.com/libremk66/DockHamster/internal/handler/migrate"
 	progress "github.com/libremk66/DockHamster/internal/handler/progress"
+	selfupdate "github.com/libremk66/DockHamster/internal/handler/selfupdate"
 	snapshot "github.com/libremk66/DockHamster/internal/handler/snapshot"
 	version "github.com/libremk66/DockHamster/internal/handler/version"
 	"github.com/libremk66/DockHamster/internal/svc"
@@ -273,6 +276,62 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Method:  http.MethodGet,
 				Path:    "/version",
 				Handler: version.VersionHandler(serverCtx),
+			},
+		},
+		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
+		rest.WithPrefix("/api"),
+	)
+
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				Method:  http.MethodGet,
+				Path:    "/favicon/resolve",
+				Handler: favicon.ResolveHandler(serverCtx),
+			},
+		},
+		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
+		rest.WithPrefix("/api"),
+	)
+
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				Method:  http.MethodGet,
+				Path:    "/selfUpdate/status",
+				Handler: selfupdate.StatusHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/selfUpdate/run",
+				Handler: selfupdate.RunHandler(serverCtx),
+			},
+		},
+		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
+		rest.WithPrefix("/api"),
+	)
+
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				Method:  http.MethodGet,
+				Path:    "/accelerator/settings",
+				Handler: accelerator.GetSettingsHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/accelerator/settings",
+				Handler: accelerator.SaveSettingsHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/accelerator/test",
+				Handler: accelerator.TestHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/accelerator/pull",
+				Handler: accelerator.PullHandler(serverCtx),
 			},
 		},
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	dockerMsgType "github.com/docker/docker/pkg/jsonmessage"
 	"github.com/libremk66/DockHamster/internal/svc"
@@ -74,23 +73,16 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	defer close(hbStop)
 	go progressHeartbeat(serviceContext, taskID, hbStop)
 	serviceContext.DockerClient.NegotiateAPIVersion(ctx)
+	// 更新期间旧容器会被停止/改名，让守护模块暂时静默
+	NoteMaintenance(serviceContext, name, 15*time.Minute)
 
 	if !opts.SkipPull {
 		oldTaskProgress.Message = "正在拉取新镜像"
 		oldTaskProgress.Percentage = 5
 		oldTaskProgress.DetailMsg = "正在拉取新镜像"
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
-		reader, err := serviceContext.DockerClient.ImagePull(ctx, imageNameAndTag, image.PullOptions{})
-		if err != nil {
-			oldTaskProgress.Message = "拉取镜像失败"
-			oldTaskProgress.DetailMsg = err.Error()
-			oldTaskProgress.IsDone = true
-			serviceContext.UpdateProgress(taskID, oldTaskProgress)
-			logx.Errorf("Failed to pull image: %s", err)
-			return OldImageOutcome{}, err
-		}
-		err = decodePullResp(reader, serviceContext, taskID)
-		if err != nil {
+		// 配置了默认加速源时走加速源拉取（失败自动回退直连）
+		if err := PullImageForUpdate(serviceContext, taskID, imageNameAndTag); err != nil {
 			oldTaskProgress.Message = "拉取镜像失败"
 			oldTaskProgress.DetailMsg = err.Error()
 			oldTaskProgress.IsDone = true
@@ -157,7 +149,8 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	oldTaskProgress.DetailMsg = "正在重命名旧容器"
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
 	currentDate := time.Now().Format("2006-01-02-15-04-05")
-	err = serviceContext.DockerClient.ContainerRename(context.Background(), id, name+"-"+currentDate)
+	backupName := name + "-" + currentDate
+	err = serviceContext.DockerClient.ContainerRename(context.Background(), id, backupName)
 	if err != nil {
 		oldTaskProgress.Message = "重命名旧容器失败"
 		oldTaskProgress.DetailMsg = err.Error()
@@ -172,6 +165,20 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	oldTaskProgress.Message = "正在创建新容器"
 	oldTaskProgress.DetailMsg = "正在创建新容器"
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
+	// 回滚：新旧替换阶段任何失败都恢复旧容器（改名备份 → 原样启动）
+	rollback := func(reason string) error {
+		rbErr := RollbackUpdate(serviceContext, name, id, name, wasRunning)
+		msg := "更新失败：" + reason + "，已回滚旧容器"
+		if rbErr != nil {
+			msg = fmt.Sprintf("更新失败：%s；回滚也失败(%v)，请手动处理（旧容器名 %s）", reason, rbErr, backupName)
+		}
+		oldTaskProgress.Message = msg
+		oldTaskProgress.DetailMsg = msg
+		oldTaskProgress.IsDone = true
+		serviceContext.UpdateProgress(taskID, oldTaskProgress)
+		logx.Errorf("更新 %s 失败并回滚: %s", name, reason)
+		return fmt.Errorf("%s", msg)
+	}
 	inspectedContainer.Config.Hostname = ""
 	inspectedContainer.Config.Image = imageNameAndTag
 	inspectedContainer.Image = imageNameAndTag
@@ -183,11 +190,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	containerName := name
 	_, err = serviceContext.DockerClient.ContainerCreate(ctx, config, hostConfig, networkingConfig, nil, containerName)
 	if err != nil {
-		oldTaskProgress.Message = "创建新容器失败"
-		oldTaskProgress.DetailMsg = err.Error()
-		oldTaskProgress.IsDone = true
-		serviceContext.UpdateProgress(taskID, oldTaskProgress)
-		return OldImageOutcome{}, err
+		return OldImageOutcome{}, rollback("创建新容器失败: " + err.Error())
 	}
 	oldTaskProgress.Message = "创建新容器成功"
 	oldTaskProgress.DetailMsg = "创建新容器成功"
@@ -196,24 +199,35 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	oldTaskProgress.Percentage = 82
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
 	if wasRunning {
-		oldTaskProgress.Message = "正在启动新容器以及删除旧容器(如果不保留旧容器)"
-		oldTaskProgress.DetailMsg = "正在启动新容器以及删除旧容器(如果不保留旧容器)"
+		oldTaskProgress.Message = "正在启动新容器"
+		oldTaskProgress.DetailMsg = "正在启动新容器"
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
 		err = serviceContext.DockerClient.ContainerStart(context.Background(), containerName, container.StartOptions{
 			CheckpointID:  "",
 			CheckpointDir: "",
 		})
 		if err != nil {
-			oldTaskProgress.Message = "启动新容器失败"
-			oldTaskProgress.DetailMsg = err.Error()
-			oldTaskProgress.IsDone = true
-			serviceContext.UpdateProgress(taskID, oldTaskProgress)
-			return OldImageOutcome{}, err
+			return OldImageOutcome{}, rollback("启动新容器失败: " + err.Error())
 		}
 	} else {
 		oldTaskProgress.Message = "容器原为停止状态，保持停止"
 		oldTaskProgress.DetailMsg = "容器原为停止状态，保持停止"
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
+	}
+	// 启动后健康校验：崩溃 / 重启循环 / OOM / unhealthy 则自动回滚旧容器
+	if wasRunning {
+		oldTaskProgress.Percentage = 85
+		oldTaskProgress.Message = "正在校验新容器运行状态"
+		oldTaskProgress.DetailMsg = "正在校验新容器运行状态"
+		serviceContext.UpdateProgress(taskID, oldTaskProgress)
+		healthy, reason := WaitContainerHealthy(serviceContext, containerName, func(msg string) {
+			oldTaskProgress.Message = msg
+			oldTaskProgress.DetailMsg = msg
+			serviceContext.UpdateProgress(taskID, oldTaskProgress)
+		})
+		if !healthy {
+			return OldImageOutcome{}, rollback(reason)
+		}
 	}
 	if opts.DelOldContainer {
 		err = serviceContext.DockerClient.ContainerRemove(context.Background(), id, container.RemoveOptions{})
@@ -260,27 +274,10 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 }
 
 // PullImageByRef 仅负责拉取镜像并消费进度流（批量更新时同一镜像只拉一次）
+// 配置了默认加速源时同样走加速（无进度展示）
 func PullImageByRef(serviceContext *svc.ServiceContext, ref string) error {
-	ctx := context.Background()
-	serviceContext.DockerClient.NegotiateAPIVersion(ctx)
-	reader, err := serviceContext.DockerClient.ImagePull(ctx, ref, image.PullOptions{})
-	if err != nil {
-		return err
-	}
-	defer func() { _ = reader.Close() }()
-	decoder := json.NewDecoder(reader)
-	for {
-		var msg dockerMsgType.JSONMessage
-		if err := decoder.Decode(&msg); err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
-		if msg.Error != nil {
-			return msg.Error
-		}
-	}
+	serviceContext.DockerClient.NegotiateAPIVersion(context.Background())
+	return PullImageForUpdate(serviceContext, "", ref)
 }
 
 func decodePullResp(reader io.ReadCloser, ctx *svc.ServiceContext, taskID string) (err error) {

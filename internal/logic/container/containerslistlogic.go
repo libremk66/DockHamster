@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"github.com/libremk66/DockHamster/internal/selfupdate"
 	"github.com/libremk66/DockHamster/internal/utiles"
 	"time"
 
@@ -18,15 +19,17 @@ type ContainersListLogic struct {
 }
 
 type Info struct {
-	Id          string `json:"id"`
-	Status      string `json:"status"`
-	Name        string `json:"name"`
-	ImageID     string `json:"imageId"`
-	UsingImage  string `json:"usingImage"`
-	CreateImage string `json:"createImage"`
-	CreateTime  string `json:"createTime"`
-	RunningTime string `json:"runningTime"`
-	HaveUpdate  bool   `json:"haveUpdate"`
+	Id          string   `json:"id"`
+	Status      string   `json:"status"`
+	Name        string   `json:"name"`
+	ImageID     string   `json:"imageId"`
+	UsingImage  string   `json:"usingImage"`
+	CreateImage string   `json:"createImage"`
+	CreateTime  string   `json:"createTime"`
+	RunningTime string   `json:"runningTime"`
+	HaveUpdate  bool     `json:"haveUpdate"`
+	Ports       []string `json:"ports"`
+	IsSelf      bool     `json:"isSelf"`
 }
 
 func NewContainersListLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ContainersListLogic {
@@ -72,12 +75,15 @@ func (l *ContainersListLogic) ContainersList() (resp *types.Resp, err error) {
 		if err != nil {
 			containerInfo.CreateImage = ""
 			l.Error("get image name error" + v.ID)
+		} else if containerInspect.Config != nil {
+			containerInfo.CreateImage = containerInspect.Config.Image
+			containerInfo.Ports = utiles.PublishedTCPPorts(containerInspect)
 		}
-		containerInfo.CreateImage = containerInspect.Config.Image
 		t := time.Unix(v.Created, 0)
 		containerInfo.CreateTime = t.Format("2006-01-02 15:04:05")
 		containerInfo.RunningTime = v.Status
 		containerInfo.HaveUpdate = v.Update
+		containerInfo.IsSelf = selfupdate.IsSelf(v.ID)
 		containerInfoList = append(containerInfoList, containerInfo)
 	}
 	resp.Data = containerInfoList

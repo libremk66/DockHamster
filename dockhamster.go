@@ -13,7 +13,10 @@ import (
 	"github.com/libremk66/DockHamster/internal/config"
 	"github.com/libremk66/DockHamster/internal/handler"
 	"github.com/libremk66/DockHamster/internal/logic/autoupdate"
+	"github.com/libremk66/DockHamster/internal/module"
+	"github.com/libremk66/DockHamster/internal/selfupdate"
 	"github.com/libremk66/DockHamster/internal/svc"
+	"github.com/libremk66/DockHamster/internal/watchdog"
 	"github.com/libremk66/DockHamster/internal/utiles"
 	"github.com/robfig/cron/v3"
 	"github.com/zeromicro/go-zero/core/conf"
@@ -36,6 +39,11 @@ type UnauthorizedResponse struct {
 }
 
 func main() {
+	// 接力自更新模式：由 selfupdate.Launch 以新镜像启动的一次性容器进入（必须最先判断）
+	if os.Getenv(selfupdate.EnvFlag) == "1" {
+		os.Exit(selfupdate.RunRelay())
+	}
+
 	logDir := "./logs"
 	ErrSetupLog := SetupLog(logDir)
 	if ErrSetupLog != nil {
@@ -63,6 +71,18 @@ func main() {
 		}))
 	defer server.Stop()
 	ctx := svc.NewServiceContext(c)
+
+	// 上次自更新结果上报（如有）：写日志 + 发通知，结果只消费一次
+	go selfupdate.ReportResultOnBoot(ctx)
+
+	// 容器守护：巡检异常退出 / OOM / 重启循环 → 通知（可在自动更新页关闭）
+	ctx.Watchdog = watchdog.New(ctx.DockerClient, watchdog.Config{
+		Disabled: func() bool { return ctx.AutoUpdate.Get().WatchdogDisabled },
+		Notify: func(title, text string) {
+			module.SendNotify(ctx.AutoUpdate.Get().Notify, title, text)
+		},
+	})
+	ctx.Watchdog.Start()
 
 	// Ensure data directory and config exist (Auto-init)
 	dataDir := "/data/config/image"
