@@ -4,6 +4,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/libremk66/DockHamster/internal/config"
 	"github.com/libremk66/DockHamster/internal/module"
+	"github.com/libremk66/DockHamster/internal/watchdog"
 	"github.com/robfig/cron/v3"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest"
@@ -21,8 +22,12 @@ type ServiceContext struct {
 	IndexCheckMiddleware       rest.Middleware
 	ProgressStore              ProgressStoreType
 	DockerClient               *client.Client
+	// 容器守护（异常告警）；在 main 里注入并启动
+	Watchdog *watchdog.Watchdog
 	// 自动更新（UI 配）
-	AutoUpdate       *module.AutoUpdateStore
+	AutoUpdate *module.AutoUpdateStore
+	// 镜像加速源（UI 配）
+	Accelerator      *module.AcceleratorStore
 	AutoUpdateState  *module.AutoUpdateState
 	AutoUpdateCheck  *module.CheckState
 	CronEngine       *cron.Cron
@@ -54,6 +59,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		ProgressStore:   make(ProgressStoreType),
 		DockerClient:    cli,
 		AutoUpdate:      module.NewAutoUpdateStore(),
+		Accelerator:     module.NewAcceleratorStore(),
 		AutoUpdateState: module.NewAutoUpdateState(),
 		AutoUpdateCheck: module.NewCheckState(),
 	}

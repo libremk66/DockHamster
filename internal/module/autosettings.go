@@ -34,6 +34,8 @@ type AutoUpdateSettings struct {
 	FeishuWebhook    string         `json:"feishuWebhook,optional"` // 已弃用：加载时自动迁移到 notify.feishu
 	NotifyOnSuccess  bool           `json:"notifyOnSuccess"`
 	NotifyOnFailure  bool           `json:"notifyOnFailure"`
+	// WatchdogDisabled 关闭容器守护告警（异常退出/OOM/重启循环 → 通知）；默认开启
+	WatchdogDisabled bool `json:"watchdogDisabled,optional"`
 }
 
 type AutoUpdateStore struct {
