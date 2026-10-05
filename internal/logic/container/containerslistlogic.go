@@ -2,9 +2,10 @@ package container
 
 import (
 	"context"
+	"time"
+
 	"github.com/libremk66/DockHamster/internal/selfupdate"
 	"github.com/libremk66/DockHamster/internal/utiles"
-	"time"
 
 	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/libremk66/DockHamster/internal/types"

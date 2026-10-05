@@ -5,6 +5,21 @@ import (
 	"strings"
 )
 
+// FriendlyPullError 把"仓库里没有这个镜像"的原始报错翻译成人话。
+// 常见于：本地 docker build 的镜像、私有/已删除的仓库、拼错的镜像名。
+func FriendlyPullError(ref string, err error) error {
+	if err == nil {
+		return nil
+	}
+	low := strings.ToLower(err.Error())
+	for _, sig := range []string{"pull access denied", "repository does not exist", "manifest unknown"} {
+		if strings.Contains(low, sig) {
+			return fmt.Errorf("镜像 %s 不在可访问的镜像仓库中（可能是本地构建、私有镜像或名字不存在），无法通过拉取更新", ref)
+		}
+	}
+	return err
+}
+
 // hubRepoAndSuffix 解析镜像引用，返回 Docker Hub 仓库路径（官方镜像补 library/）与 tag/digest 后缀。
 // 非 Docker Hub 镜像（ghcr.io、带域名/端口的私有仓库等）返回 ok=false。
 func hubRepoAndSuffix(ref string) (repo, suffix string, ok bool) {

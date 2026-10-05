@@ -94,10 +94,10 @@ func PullImageForUpdate(svcCtx *svc.ServiceContext, taskID, imageRef string) err
 	}
 	reader, err := svcCtx.DockerClient.ImagePull(context.Background(), imageRef, image.PullOptions{})
 	if err != nil {
-		return err
+		return FriendlyPullError(imageRef, err)
 	}
 	if taskID != "" {
-		return decodePullResp(reader, svcCtx, taskID)
+		return FriendlyPullError(imageRef, decodePullResp(reader, svcCtx, taskID))
 	}
-	return consumePullStream(reader)
+	return FriendlyPullError(imageRef, consumePullStream(reader))
 }
