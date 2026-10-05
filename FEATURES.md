@@ -148,6 +148,46 @@ checksums.txt      校验和（sha256sum -c 可验证完整性）
 
 > 架构说明：镜像搬运记录使用 `transports[]` 数组（当前实现 `archive`；`registry` 为预留扩展位），导入端按 `本地已有 → 包内 → registry` 顺序兜底——后续接入自建 registry / Docker Hub 私有仓库是纯增量。
 
+### 10. 更新健康校验与自动回滚
+
+更新的最后一步是**健康校验**：启动新容器后连续 3 次检查处于运行且未重启（约 6 秒）即通过；容器自带 `HEALTHCHECK` 时按它的结果等待（上限约 90 秒）。
+
+出现以下任一情况判失败并**自动回滚**：启动后退出、反复重启（Restarting）、被 OOM 杀掉、健康检查 unhealthy。回滚动作：删除不健康的新容器 → 把备份的旧容器改回原名并启动（原本是停止状态的保持停止）。**创建新容器失败、启动失败同样回滚**——更新失败不会把服务撂倒。校验中间状态实时显示在进度里（`新容器运行正常（1/3）`）。
+
+### 11. 容器异常守护
+
+面板每 60 秒巡检一次（首次采样只建基线，避免启动时误报）：
+
+- **异常退出**：退出码非 0 或被 OOM 杀掉 → 告警；退出码 0 视为正常停止，不打扰
+- **首见即近期崩溃**：面板重启期间崩掉、开机后起不来的容器也补报（10 分钟窗口）
+- **反复重启**：10 分钟内重启 ≥3 次 → 告警
+- **恢复运行**：报过故障的容器重新跑起来 → 一条恢复通知
+
+面板主动发起的停止/重启/更新会先登记**静默窗口**（停止 10 分钟 / 重启 3 分钟 / 更新 15 分钟），窗口内不告警；同容器同类告警 30 分钟冷却。开关在「自动更新页 → 通知卡片 → 容器异常告警」（默认开），走同一套通知渠道。
+
+### 12. 镜像加速源 + 加速拉取
+
+- 加速源列表可增删，**一键并发测速**（对 `https://<源>/v2/` 探针，200/401 视为可用），按延迟排序，可设默认源
+- 「**加速拉取**」：把 Docker Hub 镜像按 `源/library/nginx:tag` 拉取，完成后自动打回原始镜像名并清理临时标签；仅 Docker Hub 镜像可用（ghcr.io 等不显示入口）
+- 「**更新时自动走加速源**」：开启后更新流程优先走默认加速源，失败自动回退直连；非 Hub 镜像不受影响
+- 配置持久化在 `/data/config/accelerator.json`
+
+### 13. 面板自更新（接力容器）
+
+容器无法在自身进程内"停掉自己再重建"（stop 自己的瞬间流程即中断），因此用一次性**接力容器**完成替换：
+
+1. 主容器拉取新镜像（走加速源配置）
+2. 用**新镜像**启动接力容器（挂 docker.sock 与 /data，AutoRemove）
+3. 接力容器：停旧容器 → 改名备份 → 用旧容器完整配置 + 新镜像重建同名容器 → 启动并校验稳定性（连续 3 次检查）
+4. 成功删备份；失败自动回滚旧容器；结果写入 /data，由新面板启动时上报（日志 + 通知）
+
+入口：侧栏「有新版本」弹窗的「**立即更新面板**」；容器页对 `dockhamster` 容器点「更新」也会自动切换到该流程（容器行带「本面板」标识）。前提是新镜像包含该逻辑（v1.4.0 起）。
+
+### 14. Web 端口直达 + favicon
+
+- `/api/containers` 增加 `ports` 字段（容器对外发布的 TCP 端口：去重、升序、**跳过仅绑回环的**）；容器行渲染为可点按钮，点击新标签打开 `http://<当前面板主机>:<端口>`
+- 图标优先级：容器自带/内置/自定义 logo → 容器网页 favicon（后端解析 `<link rel=icon>`，前端缓存 7 天）→ 渐变占位
+
 ## 二、环境变量（仅初始默认值）
 
 环境变量只在 `/data/config/autoUpdate.json` **不存在时**用于生成初始配置；之后一律以页面配置为准。
@@ -160,6 +200,7 @@ checksums.txt      校验和（sha256sum -c 可验证完整性）
 | `DeleteOldImage` | `true` | 旧镜像清理初始开关（`false` 关闭） |
 | `FeishuWebhook` | 空 | 飞书 Webhook 初始值（写入 notify.feishu） |
 | `AutoUpdateConfigFile` | `/data/config/autoUpdate.json` | 配置文件路径覆盖 |
+| `AcceleratorConfigFile` | `/data/config/accelerator.json` | 加速源配置路径覆盖 |
 | `DelOldContainer` | `true` | 既有变量：更新后是否删除旧容器（`false` 保留改名后的旧容器） |
 
 ## 三、API 一览（定制部分）
@@ -187,6 +228,13 @@ checksums.txt      校验和（sha256sum -c 可验证完整性）
 | POST | `/api/migrate/imports/upload` | 上传迁移包（multipart，≤10GB） |
 | POST | `/api/migrate/imports/plan` | 导入预检（dry-run，`{file}`） |
 | POST | `/api/migrate/imports/apply` | 执行导入（`{file, items[], start, autoCreateDirs}`，异步） |
+| GET | `/api/accelerator/settings` | 读取加速源配置（列表 / 默认源 / 更新时自动加速开关） |
+| POST | `/api/accelerator/settings` | 保存加速源配置 |
+| POST | `/api/accelerator/test` | 并发测速（`{sources[]}` 可选，空则测当前列表；返回延迟与可用性） |
+| POST | `/api/accelerator/pull` | 加速拉取镜像（`{source, image}`，异步返回 taskID，进度走 `/api/progress/:id`） |
+| GET | `/api/selfUpdate/status` | 面板自更新状态（当前版本 / 自身容器 / 上次更新结果） |
+| POST | `/api/selfUpdate/run` | 一键面板自更新（异步返回 taskID） |
+| GET | `/api/favicon/resolve?url=` | 解析目标页面 favicon（抓 `<link rel=icon>`，失败回落 /favicon.ico） |
 
 ## 四、代码位置（定制改动集中在）
 
@@ -207,15 +255,26 @@ internal/utiles/migrate_artifacts.go / migrate_templates.go  新增：compose �
 internal/logic/snapshot/ + handler/snapshot/   新增：快照 API
 internal/logic/migrate/ + handler/migrate/     新增：迁移 API
 internal/module/checkupdate.go     修改：digest 判定修复 + 并发锁 + 过期清理
-internal/utiles/updatecontainer.go 修改：更新选项、状态保持、清理挂钩
+internal/utiles/updatecontainer.go 修改：更新选项、状态保持、清理挂钩；健康校验与回滚接入
 internal/utiles/getcontainerlist.go 修改：改用并发安全的查询方法
 internal/handler/routes.go         修改：注册新路由
-internal/logic/container/*.go      修改：手动更新接入设置；容器列表增加 imageId
-internal/types/types.go / svc / dockercopilot.go  小改
+internal/logic/container/*.go      修改：手动更新接入设置；容器列表增加 imageId / ports / isSelf；更新自身切换到接力自更新
+internal/types/types.go / svc / dockhamster.go  小改
+internal/selfupdate/               新增：面板自更新（接力容器 relay + 主容器侧 launch + 开机结果上报）
+internal/watchdog/watchdog.go      新增：容器异常守护巡检（退出/OOM/重启循环/恢复）
+internal/module/accelerator.go     新增：加速源配置存储
+internal/utiles/imageref.go        新增：Docker Hub 镜像引用解析（加速源前缀）
+internal/utiles/pullviaaccelerator.go 新增：加速拉取与"更新时自动加速"（失败回退直连）
+internal/utiles/healthcheck.go     新增：更新后健康校验 + 回滚（含静默窗口登记）
+internal/utiles/publishedports.go  新增：容器对外端口提取（供端口直达）
+internal/logic/accelerator/ + handler/accelerator/  新增：加速源 API
+internal/logic/selfupdate/ + handler/selfupdate/    新增：自更新 API
+internal/handler/favicon/          新增：favicon 解析 API
+internal/utiles/stopcontainer.go / restartcontainer.go  修改：登记守护静默窗口
 ```
 
 前端（[libremk66/DockHamster-UI](https://github.com/libremk66/DockHamster-UI)）：
-`src/components/AutoUpdate.jsx`（新增页面：白名单/通知/进度/旧镜像策略）、`Containers.jsx`（列表化/搜索/开关/整组弹窗/进度子行/回滚入口）、`Images.jsx`（列表化/搜索/快照分类）、`Migrate.jsx`（迁移页：体检/导出/导入）、`ProgressBar.jsx`、`Header.jsx`、`App.jsx`、`api/client.js`。
+`src/components/AutoUpdate.jsx`（新增页面：白名单/通知/进度/旧镜像策略/容器异常告警开关）、`Containers.jsx`（列表化/搜索/开关/整组弹窗/进度子行/回滚入口/端口直达/本面板标识）、`Images.jsx`（列表化/搜索/快照分类/加速拉取入口）、`Migrate.jsx`（迁移页：体检/导出/导入）、`Accelerator.jsx`（加速源面板 + 加速拉取弹窗）、`SelfUpdate.jsx`（面板自更新）、`ContainerLogo.jsx`（图标：内置/自定义 logo → favicon 兜底）、`ProgressBar.jsx`、`Header.jsx`、`App.jsx`、`api/client.js`、`utils/webFavicon.js`、`utils/format.js`。
 
 ## 五、版本与发布机制
 
@@ -230,7 +289,10 @@ internal/types/types.go / svc / dockercopilot.go  小改
 - **版本号比较**：拉取仓库 main 分支的 `version` 文件（**多源自动兜底**：GitHub raw → jsDelivr CDN → 公共镜像站，每源 6 秒超时、10 分钟缓存、记住上次可用的源）——**无需任何代理配置**
 - **镜像 digest 比对**：直接问镜像仓库"`libremk66/dockhamster:latest` 的 digest 变了没"（复用容器更新检测的同一套逻辑）——防止某次提交忘了改版本号，用户仍能收到提示
 
-**更新方式**（Docker 部署）：容器页找到 `dockhamster` 容器点「更新」，或 `docker compose pull && docker compose up -d`。面板不做"自己更新自己"（避免更新过程中断），侧栏的「有新版本」按钮会直接给出这两种方式。
+**更新方式**（Docker 部署）：
+
+- **面板内一键自更新（推荐，v1.4.0 起）**：侧栏「有新版本」弹窗点「立即更新面板」——用接力容器完成替换，**失败自动回滚**，面板重启约 20 秒；容器页对 `dockhamster` 容器点「更新」同效（自动切换到接力流程）
+- 或命令行：`docker compose pull && docker compose up -d`
 
 ## 六、与上游的关系
 
