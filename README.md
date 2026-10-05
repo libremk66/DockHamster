@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 > **Docker 容器管理面板 · 增强版**
-> 基于 [onlyLTY/dockerCopilot](https://github.com/onlyLTY/dockerCopilot)（AGPL-3.0）二次开发，专注"省心的容器运维"：自动更新、旧镜像清理、整组更新、多渠道通知、实时进度、列表化界面。
+> 基于 [onlyLTY/dockerCopilot](https://github.com/onlyLTY/dockerCopilot)（AGPL-3.0）二次开发，专注"省心的容器运维"：自动更新、旧镜像清理、整组更新、多渠道通知、实时进度、列表化界面、镜像加速源、更新健康校验与自动回滚、面板自更新、容器异常守护、Web 端口直达。
 
 ## 目录
 
@@ -40,13 +40,28 @@
 | 📊 **实时进度** | 批量与单个更新全程可见：真实进度条 + **字节级拉取进度** + 心跳耗时；批量有「进行中」面板，单个更新在容器行内**整行展开进度子行** |
 | 🏷️ **镜像快照与回滚** | 更新后的旧镜像可按策略处置：**自动清理**（默认）或**打快照保留**；容器页一键回滚到任意快照，**回滚前会自动给当前版本也打一份快照**（双向可回滚）；全局默认 + 每容器单独覆盖 |
 | 📦 **容器迁移** | 三件套：**镜像体检**（找出换台机器就会丢的镜像）→ **打包导出**（docker save 镜像 + 容器配方 + compose + 一键导入脚本）→ **上传导入**（预检冲突，支持改名 / 端口重映射 / 卷路径映射）。迁移包自带 `import.sh`，**目标机没装面板也能还原** |
+| 🩺 **更新健康校验 + 自动回滚** | 更新后观察新容器是否稳定（退出 / 反复重启 / OOM / 健康检查失败都算异常）→ 自动删掉新容器、把旧容器改回原名启动；**创建/启动失败也回滚**，更新失败不再把服务撂倒 |
+| 🧭 **Web 端口直达 + 网站图标** | 容器行内直接列出对外端口，点一下新标签打开该容器的 Web 界面；图标自动匹配——内置常见镜像 logo，没有的自动抓取该容器网页 favicon（本地缓存 7 天） |
+| ⚡ **镜像加速源 + 测速** | 内置常用加速源，支持增删与**一键并发测速**（按延迟排序）；「加速拉取」可把 Docker Hub 镜像走选定加速源拉取并自动打回原名；可开启「更新时自动走加速源」（失败自动回退直连） |
+| 🔄 **面板自更新** | 面板更新自己不再"停到一半把自己停死"：用一次性**接力容器**完成替换，**启动失败自动回滚**；更新结果开机上报（日志 + 通知渠道） |
+| 🐕 **容器异常守护** | 后台巡检：容器意外退出 / 被 OOM 杀掉 / 10 分钟内反复重启 → 推送告警；恢复运行也发一条。面板主动的停止/重启/更新不会误报（静默窗口），同容器同类告警 30 分钟冷却 |
 | 🩹 **上游修复** | ① 修复多 RepoDigests 时"永远提示有更新"（[#165](https://github.com/onlyLTY/dockerCopilot/issues/165) 同源问题）② 检查缓存并发安全 ③ 更新时保持容器原有运行状态 |
 
 ## 三、界面预览
 
-**容器页**（列表行内即为自动更新开关与上次结果；更新中的容器在整行下方展开实时进度）：
+**容器页**（列表行内即为自动更新开关与上次结果；运行中容器的端口直接显示为可点按钮，图标自动匹配；更新中的容器在整行下方展开实时进度）：
 
 ![容器页](docs/screenshots/containers.png)
+
+**镜像加速源**（一键测速按延迟排序，「加速拉取」把 Docker Hub 镜像走选定源拉取后自动打回原名）：
+
+![加速源](docs/screenshots/accelerator.png)
+
+![加速拉取](docs/screenshots/accelerator-pull.png)
+
+**面板自更新**（侧栏提示有新版本时一键接力更新，失败自动回滚；也保留命令行方式）：
+
+![自更新](docs/screenshots/self-update.png)
 
 **镜像页**（总镜像 / 使用中 / 未使用 / 快照 / 无Tag 统计卡筛选，支持搜索）：
 
@@ -107,11 +122,14 @@ docker compose up -d
 
 ⚠️ 自动更新会重建容器（等价于 `docker compose up -d` 的效果），请自行评估服务中断影响。
 
+💡 通知卡片里还有一个默认开启的 **「容器异常告警」** 开关：容器意外退出 / 被 OOM / 反复重启会走同一套通知渠道推送（面板主动操作不误报）。
+
 ## 六、上游与致谢
 
 DockHamster 的前身是原项目的一个增强分支，现已作为独立项目维护：
 
 - 上游项目：[onlyLTY/dockerCopilot](https://github.com/onlyLTY/dockerCopilot)（后端）· [dongshull/Docker-Copilot-React](https://github.com/dongshull/Docker-Copilot-React)（前端），**版权归原作者所有**
+- 感谢 [ifsherlock/dockerCopilot](https://github.com/ifsherlock/dockerCopilot)：本项目的**面板自更新（接力容器方案）**、**镜像加速源管理**、**Web 端口直达 / favicon** 等功能参考了该增强分支的设计思路（同为 AGPL-3.0），在此致谢
 - 本项目的多项通用修复已向上游提交 PR（[#166](https://github.com/onlyLTY/dockerCopilot/pull/166)），欢迎去官方 issue 下 +1
 - 完整功能与 API 说明见 [FEATURES.md](./FEATURES.md)；上游原始 README 备份见 [README.upstream.md](./README.upstream.md)
 
