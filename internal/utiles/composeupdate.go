@@ -48,6 +48,7 @@ func composeBinary() (bin string, subcmd []string, err error) {
 // composeUpService 对指定 compose 项目执行单 service 重建：
 // docker compose -f <files...> -p <project> up -d --force-recreate --no-deps <service>
 // 只影响目标 service，不触碰同项目其他容器；--no-deps 避免连带重启依赖服务。
+// 前置条件：compose 文件路径在面板容器内可达（部署时需挂载，见 README）。
 func composeUpService(meta ComposeMeta, force bool) error {
 	bin, subcmd, err := composeBinary()
 	if err != nil {
@@ -55,6 +56,9 @@ func composeUpService(meta ComposeMeta, force bool) error {
 	}
 	args := append([]string{}, subcmd...)
 	for _, f := range meta.ConfigFiles {
+		if _, statErr := os.Stat(f); statErr != nil {
+			return fmt.Errorf("compose 文件不可达: %s（面板容器需挂载该路径才能执行 compose 更新）", f)
+		}
 		args = append(args, "-f", f)
 	}
 	if meta.WorkingDir != "" {
