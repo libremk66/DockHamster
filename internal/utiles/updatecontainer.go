@@ -80,7 +80,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	// API 重建——两通道行为差异大，静默混用会造成 compose 配置漂移，宁可让用户看到明确错误。
 	if meta, mErr := ComposeMetaOfContainer(serviceContext, id); mErr == nil && meta.IsManaged {
 		logx.Infof("容器 %s 由 compose 管理（%s），分流到 compose 更新通道", name, meta.UpdateRef())
-		return OldImageOutcome{}, UpdateContainerViaCompose(serviceContext, meta, imageNameAndTag, taskID)
+		return OldImageOutcome{}, UpdateContainerViaCompose(serviceContext, meta, imageNameAndTag, opts.SkipPull, taskID)
 	}
 
 	if !opts.SkipPull {
