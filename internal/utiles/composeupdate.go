@@ -149,10 +149,11 @@ func findComposeContainerID(serviceContext *svc.ServiceContext, meta ComposeMeta
 	return "", fmt.Errorf("未找到 compose 容器 %s", meta.UpdateRef())
 }
 
-// UpdateContainerViaCompose 走 compose 通道更新单个容器：
-// 拉新镜像 → compose up 强制重建该 service → 按容器 ID 做健康校验。
+// UpdateContainerViaCompose 走 compose 通道更新单个容器。
+// skipPull=false：拉新镜像 → compose up 强制重建；skipPull=true：跳过拉取，
+// 仅按 compose 当前配置强制重建（适用改了 compose.yml 让改动生效）。
 // 失败时返回错误；由调用方决定展示（不自动回退 API 重建，避免 compose 配置漂移）。
-func UpdateContainerViaCompose(serviceContext *svc.ServiceContext, meta ComposeMeta, imageNameAndTag string, taskID string) error {
+func UpdateContainerViaCompose(serviceContext *svc.ServiceContext, meta ComposeMeta, imageNameAndTag string, skipPull bool, taskID string) error {
 	if !meta.IsManaged {
 		return fmt.Errorf("容器不属于任何 compose 项目")
 	}
@@ -167,16 +168,20 @@ func UpdateContainerViaCompose(serviceContext *svc.ServiceContext, meta ComposeM
 		})
 	}
 	fail := func(pct int, err error) error {
-		setMsg(pct, "更新失败（compose）："+err.Error(), true)
+		setMsg(pct, "操作失败（compose）："+err.Error(), true)
 		return err
 	}
 	// 重建期间容器会短暂消失，让守护模块静默（与 API 通道一致）
 	NoteMaintenance(serviceContext, meta.Service, 15*time.Minute)
 
-	setMsg(5, "compose 容器，正在拉取新镜像", false)
-	if imageNameAndTag != "" {
-		if err := PullImageByRef(serviceContext, imageNameAndTag); err != nil {
-			return fail(25, fmt.Errorf("拉取镜像失败: %w", err))
+	if skipPull {
+		setMsg(40, "跳过拉取，按 compose 配置重建", false)
+	} else {
+		setMsg(5, "compose 容器，正在拉取新镜像", false)
+		if imageNameAndTag != "" {
+			if err := PullImageByRef(serviceContext, imageNameAndTag); err != nil {
+				return fail(25, fmt.Errorf("拉取镜像失败: %w", err))
+			}
 		}
 	}
 	setMsg(60, fmt.Sprintf("正在 compose 重建 %s", meta.UpdateRef()), false)
@@ -196,6 +201,10 @@ func UpdateContainerViaCompose(serviceContext *svc.ServiceContext, meta ComposeM
 	if !healthy {
 		return fail(90, fmt.Errorf("新容器健康校验失败: %s", reason))
 	}
-	setMsg(100, "更新成功（compose）", true)
+	action := "更新"
+	if skipPull {
+		action = "重建"
+	}
+	setMsg(100, action+"成功（compose）", true)
 	return nil
 }

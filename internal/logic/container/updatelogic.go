@@ -54,6 +54,7 @@ func (l *UpdateLogic) Update(req *types.ContainerUpdateReq) (resp *types.Resp, e
 		imageNameAndTag := req.ImageNameAndTag
 		settings := l.svcCtx.AutoUpdate.Get()
 		opts := utiles.UpdateOptions{
+			SkipPull:        req.SkipPull,
 			DelOldContainer: os.Getenv("DelOldContainer") != "false",
 			DeleteOldImage:  settings.DeleteOldImage,
 			OldImagePolicy:  settings.ResolveOldImagePolicy(req.ContainerName),
