@@ -46,11 +46,12 @@ func (l *ComposeFileLogic) ComposeFile(req *types.ComposeFileReq) (resp *types.R
 		return resp, fErr
 	}
 	fileMap := make(map[string]string, len(files))
+	readErrors := make(map[string]string)
 	for _, f := range files {
 		data, readErr := os.ReadFile(f)
 		if readErr != nil {
 			l.Errorf("读取 compose 文件失败 %s: %v", f, readErr)
-			fileMap[f] = "（读取失败: " + readErr.Error() + "）"
+			readErrors[f] = readErr.Error()
 			continue
 		}
 		fileMap[f] = string(data)
@@ -62,6 +63,7 @@ func (l *ComposeFileLogic) ComposeFile(req *types.ComposeFileReq) (resp *types.R
 		"service":    meta.Service,
 		"workingDir": meta.WorkingDir,
 		"files":      fileMap,
+		"errors":     readErrors,
 	}
 	return resp, nil
 }
