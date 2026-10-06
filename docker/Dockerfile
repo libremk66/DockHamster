@@ -1,5 +1,5 @@
-# 使用 Alpine 作为基础镜像
-FROM alpine
+# 使用 Alpine 作为基础镜像（固定 tag，避免 latest 漂移）
+FROM alpine:3.21
 LABEL authors="onlyLTY, libremk66"
 WORKDIR /app
 
