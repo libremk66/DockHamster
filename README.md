@@ -117,13 +117,14 @@ docker compose up -d
 
 **部署要求**：面板容器需能读到 compose 文件并具备 `docker compose` 命令：
 
-1. 镜像已内置 compose plugin（v1.4.1 起）；自建镜像时确保安装 `docker-cli-compose`
-2. 在 volumes 中挂载 compose 文件所在目录（面板按容器 labels 里记录的**宿主机原始路径**查找文件，路径必须与宿主机一致）：
+1. 镜像已内置 compose plugin（自建镜像时确保安装 `docker-cli-compose`）
+2. 在 volumes 中挂载 compose 文件所在目录（面板按容器 labels 里记录的**宿主机原始路径**查找文件，挂载点需与宿主路径一致）：
    ```yaml
    volumes:
-     - /vol1/1000/docker:/vol1/1000/docker   # 按你的 compose 项目存放路径挂载
+     - <compose 项目所在目录>:<compose 项目所在目录>
    ```
 3. compose 文件不可达时更新会明确报错（不会误删重建），按提示补挂载即可
+4. 若同一数据卷在宿主上有多个挂载视角，可用环境变量 `COMPOSE_ALT_ROOTS`（逗号分隔前缀）配置兜底探测；未配置时不启用
 
 ## 六、自动更新怎么用
 
