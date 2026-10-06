@@ -92,6 +92,10 @@ type IdReq struct {
 	Id string `path:"id"`
 }
 
+type ComposeFileReq struct {
+	ContainerId string `path:"id"`
+}
+
 type LoginReq struct {
 	SecretKey string `form:"secretKey,optional"`
 }

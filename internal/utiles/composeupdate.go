@@ -46,11 +46,11 @@ func composeBinary() (bin string, subcmd []string, err error) {
 	return "", nil, fmt.Errorf("面板容器内未找到 docker compose / docker-compose")
 }
 
-// resolveConfigFiles 将 compose 文件路径解析为面板容器内可达的路径。
+// ResolveConfigFiles 将 compose 文件路径解析为面板容器内可达的路径。
 // labels 记录的是容器创建时宿主机视角的路径，面板容器内该路径不一定一致
 // （如 NAS 上同一数据卷可经 /vol1/... 或 /nas/vol1/... 访问）。
 // 策略：原路径可达则原样使用；否则按备选前缀逐一探测替换。
-func resolveConfigFiles(paths []string) ([]string, error) {
+func ResolveConfigFiles(paths []string) ([]string, error) {
 	const extraRoots = "/nas"
 	resolved := make([]string, len(paths))
 	for i, p := range paths {
@@ -78,7 +78,7 @@ func composeUpService(meta ComposeMeta, force bool) error {
 		return err
 	}
 	args := append([]string{}, subcmd...)
-	files, err := resolveConfigFiles(meta.ConfigFiles)
+	files, err := ResolveConfigFiles(meta.ConfigFiles)
 	if err != nil {
 		return err
 	}

@@ -62,6 +62,10 @@ type IdReq {
 	Id string `path:"id"`
 }
 
+type ComposeFileReq {
+	ContainerId string `path:"id"`
+}
+
 type ContainerRestoreReq {
 	Filename string `json:"filename"`
 }
