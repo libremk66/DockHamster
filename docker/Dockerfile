@@ -9,7 +9,8 @@ COPY dc-back/dist/$TARGETPLATFORM/dockhamster ./dockhamster
 COPY dc-back/etc/. ./etc
 COPY start.sh ./start.sh
 
-RUN apk add --no-cache tzdata \
+# 安装 docker compose plugin（compose 感知更新需要容器内可执行 compose 命令）
+RUN apk add --no-cache tzdata docker-cli-compose \
     && chmod +x start.sh \
     && chmod +x dockhamster
 
