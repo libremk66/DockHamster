@@ -47,19 +47,44 @@ func composeBinary() (bin string, subcmd []string, err error) {
 }
 
 // ResolveConfigFiles 将 compose 文件路径解析为面板容器内可达的路径。
-// labels 记录的是容器创建时宿主机视角的路径，面板容器内该路径不一定一致
-// （如 NAS 上同一数据卷可经 /vol1/... 或 /nas/vol1/... 访问）。
-// 策略：原路径可达则原样使用；否则按备选前缀逐一探测替换。
+// altRootPrefixes 备用根前缀：同一数据卷在宿主上可能有多个挂载视角，
+// 面板容器内只有其中一种可达。权威来源为环境变量 COMPOSE_ALT_ROOTS
+// （逗号分隔前缀）；未配置时不启用兜底，路径不可达直接报错。
+func altRootPrefixes() []string {
+	v := os.Getenv("COMPOSE_ALT_ROOTS")
+	if v == "" {
+		return nil
+	}
+	parts := strings.Split(v, ",")
+	roots := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			roots = append(roots, p)
+		}
+	}
+	return roots
+}
+
+// ResolveConfigFiles 将 compose 文件路径解析为面板容器内可达的路径。
+// labels 记录的是容器创建时宿主机视角的路径，面板容器内该路径不一定一致。
+// 策略：原路径可达则原样使用；否则按备用根前缀逐一探测替换，全部不可达才报错。
 func ResolveConfigFiles(paths []string) ([]string, error) {
-	const extraRoots = "/nas"
+	roots := altRootPrefixes()
 	resolved := make([]string, len(paths))
 	for i, p := range paths {
 		resolved[i] = p
 		if _, err := os.Stat(p); err == nil {
 			continue
 		}
-		alt := filepath.Join(extraRoots, p)
-		if _, err := os.Stat(alt); err != nil {
+		alt := ""
+		for _, root := range roots {
+			candidate := filepath.Join(root, p)
+			if _, err := os.Stat(candidate); err == nil {
+				alt = candidate
+				break
+			}
+		}
+		if alt == "" {
 			return nil, fmt.Errorf("compose 文件不可达: %s（面板容器需挂载该路径才能执行 compose 更新）", p)
 		}
 		logx.Infof("compose 文件路径解析: %s -> %s", p, alt)
