@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -45,6 +46,28 @@ func composeBinary() (bin string, subcmd []string, err error) {
 	return "", nil, fmt.Errorf("面板容器内未找到 docker compose / docker-compose")
 }
 
+// resolveConfigFiles 将 compose 文件路径解析为面板容器内可达的路径。
+// labels 记录的是容器创建时宿主机视角的路径，面板容器内该路径不一定一致
+// （如 NAS 上同一数据卷可经 /vol1/... 或 /nas/vol1/... 访问）。
+// 策略：原路径可达则原样使用；否则按备选前缀逐一探测替换。
+func resolveConfigFiles(paths []string) ([]string, error) {
+	const extraRoots = "/nas"
+	resolved := make([]string, len(paths))
+	for i, p := range paths {
+		resolved[i] = p
+		if _, err := os.Stat(p); err == nil {
+			continue
+		}
+		alt := filepath.Join(extraRoots, p)
+		if _, err := os.Stat(alt); err != nil {
+			return nil, fmt.Errorf("compose 文件不可达: %s（面板容器需挂载该路径才能执行 compose 更新）", p)
+		}
+		logx.Infof("compose 文件路径解析: %s -> %s", p, alt)
+		resolved[i] = alt
+	}
+	return resolved, nil
+}
+
 // composeUpService 对指定 compose 项目执行单 service 重建：
 // docker compose -f <files...> -p <project> up -d --force-recreate --no-deps <service>
 // 只影响目标 service，不触碰同项目其他容器；--no-deps 避免连带重启依赖服务。
@@ -55,10 +78,11 @@ func composeUpService(meta ComposeMeta, force bool) error {
 		return err
 	}
 	args := append([]string{}, subcmd...)
-	for _, f := range meta.ConfigFiles {
-		if _, statErr := os.Stat(f); statErr != nil {
-			return fmt.Errorf("compose 文件不可达: %s（面板容器需挂载该路径才能执行 compose 更新）", f)
-		}
+	files, err := resolveConfigFiles(meta.ConfigFiles)
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
 		args = append(args, "-f", f)
 	}
 	if meta.WorkingDir != "" {
