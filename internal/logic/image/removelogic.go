@@ -2,8 +2,8 @@ package image
 
 import (
 	"context"
+
 	"github.com/libremk66/DockHamster/internal/utiles"
-	"strings"
 
 	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/libremk66/DockHamster/internal/types"
@@ -27,10 +27,6 @@ func NewRemoveLogic(ctx context.Context, svcCtx *svc.ServiceContext) *RemoveLogi
 
 func (l *RemoveLogic) Remove(req *types.RemoveImageReq) (resp *types.Resp, err error) {
 	resp = &types.Resp{}
-	var imageId = req.Id
-	if strings.HasPrefix(imageId, "sha256:") {
-		imageId = strings.TrimPrefix(imageId, "sha256:")
-	}
 	err = utiles.RemoveImage(l.svcCtx, req.Id, req.Force)
 	if err != nil {
 		resp.Code = 409
