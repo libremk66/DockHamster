@@ -1,6 +1,7 @@
 package autoupdate
 
 import (
+	"github.com/libremk66/DockHamster/internal/notify"
 	"net/http"
 
 	"github.com/libremk66/DockHamster/internal/logic/autoupdate"
@@ -82,8 +83,8 @@ func TasksHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 func TestNotifyHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Channel string                `json:"channel"`
-			Config  *module.NotifyChannel `json:"config,optional"`
+			Channel string          `json:"channel"`
+			Config  *notify.Channel `json:"config,optional"`
 		}
 		if err := httpx.Parse(r, &req); err != nil {
 			httpx.ErrorCtx(r.Context(), w, err)

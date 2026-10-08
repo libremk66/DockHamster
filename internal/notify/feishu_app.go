@@ -1,4 +1,4 @@
-package module
+package notify
 
 // 飞书自建应用推送（App ID / App Secret 模式）。
 // 流程：tenant_access_token（内存缓存，提前 10 分钟过期）→ POST /open-apis/im/v1/messages
@@ -6,6 +6,8 @@ package module
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,8 +17,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // 飞书开放平台域名（Lark 国际版可覆盖为 https://open.larksuite.com）
@@ -105,7 +105,7 @@ func feishuSendOnce(domain, token, receiveID, receiveIDType, msgType, content st
 		"receive_id": receiveID,
 		"msg_type":   msgType,
 		"content":    content,
-		"uuid":       uuid.New().String(), // 幂等：网络重试不会重复投递
+		"uuid":       randomHex(16), // 幂等：网络重试不会重复投递
 	})
 	resp, err := notifyJSONRequest(http.MethodPost, u, token, string(body))
 	if err != nil {
@@ -130,9 +130,9 @@ func feishuCardColor(title, text string) string {
 }
 
 // sendFeishuApp 应用模式推送：交互卡片优先，失败自动回退纯文本
-func sendFeishuApp(c NotifyChannel, title, text string) NotifyResult {
+func sendFeishuApp(c Channel, title, text string) Result {
 	label := ChannelLabels["feishu"]
-	fail := func(err string) NotifyResult { return NotifyResult{Channel: label, OK: false, Error: err} }
+	fail := func(err string) Result { return Result{Channel: label, OK: false, Error: err} }
 
 	if strings.TrimSpace(c.AppID) == "" {
 		return fail("未填 App ID")
@@ -171,7 +171,7 @@ func sendFeishuApp(c NotifyChannel, title, text string) NotifyResult {
 	cardBody, _ := json.Marshal(card)
 	cardErr := feishuSendOnce(domain, token, c.ReceiveID, ridType, "interactive", string(cardBody))
 	if cardErr == nil {
-		return NotifyResult{Channel: label, OK: true}
+		return Result{Channel: label, OK: true}
 	}
 
 	// ② 回退纯文本（部分企业租户限制卡片消息）
@@ -179,7 +179,7 @@ func sendFeishuApp(c NotifyChannel, title, text string) NotifyResult {
 	if txtErr := feishuSendOnce(domain, token, c.ReceiveID, ridType, "text", string(txtBody)); txtErr != nil {
 		return fail(fmt.Sprintf("发送失败：%s（卡片模式同样失败：%s）", txtErr.Error(), cardErr.Error()))
 	}
-	return NotifyResult{Channel: label, OK: true}
+	return Result{Channel: label, OK: true}
 }
 
 // ---- 小工具（JSON 值取值）----
@@ -200,4 +200,13 @@ func intOf(v interface{}) int {
 func strOf(v interface{}) string {
 	s, _ := v.(string)
 	return s
+}
+
+// randomHex 本地随机十六进制串（免第三方依赖；用于飞书消息幂等 uuid）
+func randomHex(n int) string {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b)
 }

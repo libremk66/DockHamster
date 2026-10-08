@@ -1,4 +1,4 @@
-package module
+package notify
 
 import (
 	"strings"
@@ -9,12 +9,12 @@ import (
 func TestSendFeishuAppValidation(t *testing.T) {
 	cases := []struct {
 		name string
-		ch   NotifyChannel
+		ch   Channel
 		want string
 	}{
-		{"缺 App ID", NotifyChannel{AppSecret: "s", ReceiveID: "r"}, "未填 App ID"},
-		{"缺 App Secret", NotifyChannel{AppID: "a", ReceiveID: "r"}, "未填 App Secret"},
-		{"缺接收者", NotifyChannel{AppID: "a", AppSecret: "s"}, "未填接收者 ID"},
+		{"缺 App ID", Channel{AppSecret: "s", ReceiveID: "r"}, "未填 App ID"},
+		{"缺 App Secret", Channel{AppID: "a", ReceiveID: "r"}, "未填 App Secret"},
+		{"缺接收者", Channel{AppID: "a", AppSecret: "s"}, "未填接收者 ID"},
 	}
 	for _, tc := range cases {
 		res := sendFeishuApp(tc.ch, "标题", "正文")
@@ -57,12 +57,12 @@ func TestJSONValueHelpers(t *testing.T) {
 func TestSendQQBotValidation(t *testing.T) {
 	cases := []struct {
 		name string
-		ch   NotifyChannel
+		ch   Channel
 		want string
 	}{
-		{"缺 AppID", NotifyChannel{AppSecret: "s", ReceiveID: "r"}, "未填 AppID"},
-		{"缺 ClientSecret", NotifyChannel{AppID: "a", ReceiveID: "r"}, "未填 ClientSecret"},
-		{"缺目标", NotifyChannel{AppID: "a", AppSecret: "s"}, "未填接收目标"},
+		{"缺 AppID", Channel{AppSecret: "s", ReceiveID: "r"}, "未填 AppID"},
+		{"缺 ClientSecret", Channel{AppID: "a", ReceiveID: "r"}, "未填 ClientSecret"},
+		{"缺目标", Channel{AppID: "a", AppSecret: "s"}, "未填接收目标"},
 	}
 	for _, tc := range cases {
 		res := sendQQBot(tc.ch, "标题", "正文")
@@ -88,12 +88,12 @@ func TestQQHintFor(t *testing.T) {
 func TestSendWecomAppValidation(t *testing.T) {
 	cases := []struct {
 		name string
-		ch   NotifyChannel
+		ch   Channel
 		want string
 	}{
-		{"缺 CorpID", NotifyChannel{AppSecret: "s", AgentID: "1"}, "未填 CorpID"},
-		{"缺 Secret", NotifyChannel{AppID: "a", AgentID: "1"}, "未填应用 Secret"},
-		{"缺 AgentID", NotifyChannel{AppID: "a", AppSecret: "s"}, "未填 AgentID"},
+		{"缺 CorpID", Channel{AppSecret: "s", AgentID: "1"}, "未填 CorpID"},
+		{"缺 Secret", Channel{AppID: "a", AgentID: "1"}, "未填应用 Secret"},
+		{"缺 AgentID", Channel{AppID: "a", AppSecret: "s"}, "未填 AgentID"},
 	}
 	for _, tc := range cases {
 		res := sendWecomApp(tc.ch, "标题", "正文")

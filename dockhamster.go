@@ -4,6 +4,7 @@ import (
 	"embed"
 	"flag"
 	"fmt"
+	"github.com/libremk66/DockHamster/internal/notify"
 	"go/types"
 	"io/fs"
 	"log"
@@ -14,7 +15,6 @@ import (
 	"github.com/libremk66/DockHamster/internal/config"
 	"github.com/libremk66/DockHamster/internal/handler"
 	"github.com/libremk66/DockHamster/internal/logic/autoupdate"
-	"github.com/libremk66/DockHamster/internal/module"
 	"github.com/libremk66/DockHamster/internal/selfupdate"
 	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/libremk66/DockHamster/internal/utiles"
@@ -80,7 +80,7 @@ func main() {
 	ctx.Watchdog = watchdog.New(ctx.DockerClient, watchdog.Config{
 		Disabled: func() bool { return ctx.AutoUpdate.Get().WatchdogDisabled },
 		Notify: func(title, text string) {
-			module.SendNotify(ctx.AutoUpdate.Get().Notify, title, text)
+			notify.Send(ctx.AutoUpdate.Get().Notify, title, text)
 		},
 	})
 	ctx.Watchdog.Start()

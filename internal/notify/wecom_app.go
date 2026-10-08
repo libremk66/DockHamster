@@ -1,4 +1,4 @@
-package module
+package notify
 
 // 企业微信「应用消息」推送（CorpID / Secret / AgentID 模式，可推送到个人微信）。
 // 流程：GET /cgi-bin/gettoken（内存缓存，提前 5 分钟刷新）→ POST /cgi-bin/message/send
@@ -118,9 +118,9 @@ func wecomSplitContent(content string, maxBytes int) []string {
 }
 
 // sendWecomApp 企业微信应用消息：内容分块逐条发送
-func sendWecomApp(c NotifyChannel, title, text string) NotifyResult {
+func sendWecomApp(c Channel, title, text string) Result {
 	label := ChannelLabels["wecom"]
-	fail := func(err string) NotifyResult { return NotifyResult{Channel: label, OK: false, Error: err} }
+	fail := func(err string) Result { return Result{Channel: label, OK: false, Error: err} }
 
 	if strings.TrimSpace(c.AppID) == "" {
 		return fail("未填 CorpID（企业 ID）")
@@ -163,5 +163,5 @@ func sendWecomApp(c NotifyChannel, title, text string) NotifyResult {
 				i+1, code, wecomCleanMsg(strOf(resp["errmsg"])), wecomHintFor(code)))
 		}
 	}
-	return NotifyResult{Channel: label, OK: true}
+	return Result{Channel: label, OK: true}
 }

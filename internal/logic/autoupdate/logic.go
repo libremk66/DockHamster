@@ -2,6 +2,7 @@ package autoupdate
 
 import (
 	"context"
+	"github.com/libremk66/DockHamster/internal/notify"
 	"strings"
 	"time"
 
@@ -191,7 +192,7 @@ func (l *AutoUpdateLogic) Tasks() (*types.Resp, error) {
 }
 
 // TestNotify 发送一条渠道测试消息（draft 为前端当前表单值；为空则用已保存配置）
-func (l *AutoUpdateLogic) TestNotify(channel string, draft *module.NotifyChannel) (*types.Resp, error) {
+func (l *AutoUpdateLogic) TestNotify(channel string, draft *notify.Channel) (*types.Resp, error) {
 	resp := &types.Resp{}
 	if strings.TrimSpace(channel) == "" {
 		resp.Code = 400
@@ -199,11 +200,11 @@ func (l *AutoUpdateLogic) TestNotify(channel string, draft *module.NotifyChannel
 		resp.Data = map[string]interface{}{}
 		return resp, nil
 	}
-	cfg := l.svcCtx.AutoUpdate.Get().Notify.ChannelByName(channel)
+	cfg := l.svcCtx.AutoUpdate.Get().Notify.ByName(channel)
 	if draft != nil {
 		cfg = *draft
 	}
-	res := module.SendChannel(channel, cfg, "🔔 DockHamster 通知测试", "如果你看到这条消息，说明该渠道配置成功 ✅")
+	res := notify.SendOne(channel, cfg, "🔔 DockHamster 通知测试", "如果你看到这条消息，说明该渠道配置成功 ✅")
 	if !res.OK {
 		resp.Code = 500
 		resp.Msg = "发送失败：" + res.Error

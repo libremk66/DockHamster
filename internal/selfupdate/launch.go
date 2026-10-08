@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"context"
 	"fmt"
+	"github.com/libremk66/DockHamster/internal/notify"
 	"os"
 	"strings"
 	"time"
@@ -10,7 +11,6 @@ import (
 	dockerTypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
-	"github.com/libremk66/DockHamster/internal/module"
 	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/libremk66/DockHamster/internal/utiles"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -152,5 +152,5 @@ func ReportResultOnBoot(svcCtx *svc.ServiceContext) {
 	}
 	logx.Info(title + " | " + strings.ReplaceAll(text, "\n", " "))
 	setLastResult(res)
-	module.SendNotify(svcCtx.AutoUpdate.Get().Notify, title, text)
+	notify.Send(svcCtx.AutoUpdate.Get().Notify, title, text)
 }

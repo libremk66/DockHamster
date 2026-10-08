@@ -2,6 +2,7 @@ package module
 
 import (
 	"encoding/json"
+	"github.com/libremk66/DockHamster/internal/notify"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,12 +29,12 @@ type AutoUpdateSettings struct {
 	// 快照保留数量（每个镜像最多保留几个快照）
 	SnapshotKeep int `json:"snapshotKeep,optional"`
 	// 快照命名空间与命名模板，如 dh-snap + {name}:{date}-{time}
-	SnapshotPrefix   string         `json:"snapshotPrefix,optional"`
-	SnapshotTemplate string         `json:"snapshotTemplate,optional"`
-	Notify           NotifyChannels `json:"notify"`                 // 通知渠道（飞书/企业微信/钉钉/Bark/Server酱/Telegram/自定义）
-	FeishuWebhook    string         `json:"feishuWebhook,optional"` // 已弃用：加载时自动迁移到 notify.feishu
-	NotifyOnSuccess  bool           `json:"notifyOnSuccess"`
-	NotifyOnFailure  bool           `json:"notifyOnFailure"`
+	SnapshotPrefix   string          `json:"snapshotPrefix,optional"`
+	SnapshotTemplate string          `json:"snapshotTemplate,optional"`
+	Notify           notify.Channels `json:"notify"`                 // 通知渠道（飞书/企业微信/钉钉/Bark/Server酱/Telegram/自定义）
+	FeishuWebhook    string          `json:"feishuWebhook,optional"` // 已弃用：加载时自动迁移到 notify.feishu
+	NotifyOnSuccess  bool            `json:"notifyOnSuccess"`
+	NotifyOnFailure  bool            `json:"notifyOnFailure"`
 	// WatchdogDisabled 关闭容器守护告警（异常退出/OOM/重启循环 → 通知）；默认开启
 	WatchdogDisabled bool `json:"watchdogDisabled,optional"`
 }
@@ -187,7 +188,7 @@ func defaultAutoSettings() AutoUpdateSettings {
 		se.DeleteOldImage = false
 	}
 	if v := strings.TrimSpace(os.Getenv("FeishuWebhook")); v != "" {
-		se.Notify.Feishu = NotifyChannel{Enabled: true, Webhook: v}
+		se.Notify.Feishu = notify.Channel{Enabled: true, Webhook: v}
 	}
 	return se
 }
