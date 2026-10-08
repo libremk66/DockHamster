@@ -158,13 +158,14 @@ func (l *AutoUpdateLogic) Status() (*types.Resp, error) {
 	for _, t := range active {
 		item := map[string]interface{}{
 			"name": t.Name, "taskID": t.TaskID,
-			"percentage": 0, "message": "等待中", "detailMsg": "", "isDone": false,
+			"percentage": 0, "message": "等待中", "detailMsg": "", "isDone": false, "failed": false,
 		}
 		if p, ok := l.svcCtx.GetProgress(t.TaskID); ok {
 			item["percentage"] = p.Percentage
 			item["message"] = p.Message
 			item["detailMsg"] = p.DetailMsg
 			item["isDone"] = p.IsDone
+			item["failed"] = p.Failed
 		}
 		activeTasks = append(activeTasks, item)
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest"
 	"sync"
+	"time"
 )
 
 type ServiceContext struct {
@@ -44,6 +45,9 @@ type TaskProgress struct {
 	Name       string
 	DetailMsg  string
 	IsDone     bool
+	// Failed 标记失败态（前端红色展示；与 IsDone 组合区分"完成/失败"，不加 json tag 不直接序列化）
+	Failed    bool
+	UpdatedAt time.Time // 内部用：已完成任务过期清理依据
 }
 
 type ProgressStoreType map[string]TaskProgress
@@ -68,6 +72,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 func (ctx *ServiceContext) UpdateProgress(taskID string, progress TaskProgress) {
 	ctx.mu.Lock()
 	defer ctx.mu.Unlock()
+	progress.UpdatedAt = time.Now()
 	ctx.ProgressStore[taskID] = progress
 }
 
@@ -76,4 +81,19 @@ func (ctx *ServiceContext) GetProgress(taskID string) (TaskProgress, bool) {
 	defer ctx.mu.Unlock()
 	progress, ok := ctx.ProgressStore[taskID]
 	return progress, ok
+}
+
+// PurgeFinishedProgress 清理"已完成且 N 时间未再更新"的进度记录，
+// 避免长期运行下 ProgressStore 随任务数缓涨（活跃任务的进度每 2 秒被心跳刷新，不会被清）。
+func (ctx *ServiceContext) PurgeFinishedProgress(olderThan time.Duration) int {
+	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
+	n := 0
+	for id, p := range ctx.ProgressStore {
+		if p.IsDone && time.Since(p.UpdatedAt) > olderThan {
+			delete(ctx.ProgressStore, id)
+			n++
+		}
+	}
+	return n
 }

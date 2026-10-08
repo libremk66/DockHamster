@@ -119,9 +119,16 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 		groups[t.pullRef] = append(groups[t.pullRef], t)
 	}
 	for pullRef, group := range groups {
+		// 组内每台的 taskID 都带上：同镜像只拉一次，拉取进度对每一台的行都可见
+		// （此前拉取阶段不写任何进度，是"整页停在等待中像卡死"的主因）
+		groupTaskIDs := make([]string, 0, len(group))
+		for _, t := range group {
+			groupTaskIDs = append(groupTaskIDs, t.taskID)
+		}
 		logx.Infof("自动更新：拉取 %s（%d 个容器共用）", pullRef, len(group))
-		if err := PullImageByRef(serviceContext, pullRef); err != nil {
+		if err := PullImageByRefForTasks(serviceContext, pullRef, groupTaskIDs); err != nil {
 			logx.Errorf("自动更新：拉取 %s 失败，跳过本组：%v", pullRef, err)
+			// 失败进度已由拉取流程写进各 taskID（含 Failed 标记，UI 显示红色）
 			for _, t := range group {
 				result.Failed = append(result.Failed, module.AutoRunFailure{Name: t.name, Error: "拉取失败: " + oneLine(err.Error())})
 				serviceContext.AutoUpdateState.SetContainer(t.name, false, "拉取失败: "+oneLine(err.Error()))

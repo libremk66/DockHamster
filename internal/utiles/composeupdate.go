@@ -185,7 +185,7 @@ func UpdateContainerViaCompose(serviceContext *svc.ServiceContext, meta ComposeM
 	} else {
 		setMsg(5, "compose 容器，正在拉取新镜像", false)
 		if imageNameAndTag != "" {
-			if err := PullImageByRef(serviceContext, imageNameAndTag); err != nil {
+			if err := PullImageByRefForTasks(serviceContext, imageNameAndTag, []string{taskID}); err != nil {
 				return fail(25, fmt.Errorf("拉取镜像失败: %w", err))
 			}
 		}
