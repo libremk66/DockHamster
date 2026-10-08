@@ -33,7 +33,8 @@ type NotifyChannel struct {
 	Headers      string `json:"headers,optional"`      // 自定义请求头（JSON 文本）
 	BodyTemplate string `json:"bodyTemplate,optional"` // 自定义 body 模板（{title} {text}）
 	// 飞书「应用模式」（App ID/Secret；填了就走应用推送，与群机器人 Webhook 二选一）
-	AppID         string `json:"appId,optional"`         // 自建应用 App ID
+	AppID         string `json:"appId,optional"`         // 自建应用 App ID（企业微信为 CorpID）
+	AgentID       string `json:"agentId,optional"`       // 企业微信应用 AgentID
 	AppSecret     string `json:"appSecret,optional"`     // 自建应用 App Secret
 	ReceiveID     string `json:"receiveId,optional"`     // 接收者 ID（open_id/user_id/email/群 chat_id）
 	ReceiveIDType string `json:"receiveIdType,optional"` // 接收者类型，默认 open_id
@@ -136,8 +137,12 @@ func SendChannel(channelType string, c NotifyChannel, title, text string) Notify
 		return ok()
 
 	case "wecom":
+		// 应用模式（CorpID/Secret/AgentID）：填了就优先走应用消息（可推个人微信）
+		if strings.TrimSpace(c.AppID) != "" || strings.TrimSpace(c.AppSecret) != "" {
+			return sendWecomApp(c, title, text)
+		}
 		if c.Webhook == "" {
-			return fail("未填 Webhook 地址")
+			return fail("未填 Webhook 地址（或改用 CorpID/Secret/AgentID 应用模式）")
 		}
 		// 企业微信 text 上限 2048 字节，先按字节截断
 		body, _ := json.Marshal(map[string]interface{}{

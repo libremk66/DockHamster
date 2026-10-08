@@ -42,7 +42,7 @@ func feishuTenantToken(appID, appSecret, domain string) (string, error) {
 	feishuTokenMu.Unlock()
 
 	body, _ := json.Marshal(map[string]string{"app_id": appID, "app_secret": appSecret})
-	resp, err := feishuRequest(http.MethodPost, domain+"/open-apis/auth/v3/tenant_access_token/internal", "", string(body))
+	resp, err := notifyJSONRequest(http.MethodPost, domain+"/open-apis/auth/v3/tenant_access_token/internal", "", string(body))
 	if err != nil {
 		return "", err
 	}
@@ -67,8 +67,8 @@ func feishuTenantToken(appID, appSecret, domain string) (string, error) {
 	return token, nil
 }
 
-// feishuRequest 发送请求并解析 JSON 响应（飞书全部接口返回 {code,msg,...}）
-func feishuRequest(method, target, token, body string) (map[string]interface{}, error) {
+// notifyJSONRequest 发送 JSON 请求并解析响应（飞书/企业微信等接口都是 {code|errcode,msg} 结构）
+func notifyJSONRequest(method, target, token, body string) (map[string]interface{}, error) {
 	var reader io.Reader
 	if body != "" {
 		reader = bytes.NewReader([]byte(body))
@@ -107,7 +107,7 @@ func feishuSendOnce(domain, token, receiveID, receiveIDType, msgType, content st
 		"content":    content,
 		"uuid":       uuid.New().String(), // 幂等：网络重试不会重复投递
 	})
-	resp, err := feishuRequest(http.MethodPost, u, token, string(body))
+	resp, err := notifyJSONRequest(http.MethodPost, u, token, string(body))
 	if err != nil {
 		return err
 	}

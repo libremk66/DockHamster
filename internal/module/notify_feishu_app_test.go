@@ -83,3 +83,36 @@ func TestQQHintFor(t *testing.T) {
 		t.Fatal("普通错误不应附提示")
 	}
 }
+
+// 企业微信应用模式：字段缺失直接报错；分块按行切且不超上限
+func TestSendWecomAppValidation(t *testing.T) {
+	cases := []struct {
+		name string
+		ch   NotifyChannel
+		want string
+	}{
+		{"缺 CorpID", NotifyChannel{AppSecret: "s", AgentID: "1"}, "未填 CorpID"},
+		{"缺 Secret", NotifyChannel{AppID: "a", AgentID: "1"}, "未填应用 Secret"},
+		{"缺 AgentID", NotifyChannel{AppID: "a", AppSecret: "s"}, "未填 AgentID"},
+	}
+	for _, tc := range cases {
+		res := sendWecomApp(tc.ch, "标题", "正文")
+		if res.OK || !strings.Contains(res.Error, tc.want) {
+			t.Fatalf("%s：res=%+v，想要包含 %q", tc.name, res, tc.want)
+		}
+	}
+}
+
+func TestWecomSplitContent(t *testing.T) {
+	// 长内容按 2048 字节切成多块，每块不超限
+	long := strings.Repeat("这是一行通知内容 abcdefg\n", 200) // ≈ 4000+ 字节
+	chunks := wecomSplitContent(long, 2048)
+	if len(chunks) < 2 {
+		t.Fatalf("应切成多块，实际 %d 块", len(chunks))
+	}
+	for i, c := range chunks {
+		if len([]byte(c)) > 2048 {
+			t.Fatalf("第 %d 块超限：%d 字节", i+1, len([]byte(c)))
+		}
+	}
+}
