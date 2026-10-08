@@ -309,20 +309,90 @@ type ActiveTask struct {
 	TaskID string `json:"taskID"`
 }
 
-// AutoUpdateState 自动更新运行状态（内存，最近 30 次记录；重启即清空）
+// AutoUpdateState 自动更新运行状态（最近 30 次记录 + 每容器最近状态）。
+// 持久化到 /data/config/autoupdate-history.json：面板自更新/版本升级重建容器后记录不丢。
 type AutoUpdateState struct {
-	mu      sync.Mutex
-	running bool
-	runs    []AutoUpdateRunResult
-	last    map[string]ContainerAutoStatus
-	active  []ActiveTask
+	mu       sync.Mutex
+	running  bool
+	runs     []AutoUpdateRunResult
+	last     map[string]ContainerAutoStatus
+	active   []ActiveTask
+	path     string
+	lastSave time.Time
+}
+
+func autoUpdateHistoryPath() string {
+	if p := os.Getenv("AutoUpdateHistoryFile"); p != "" {
+		return p
+	}
+	return "/data/config/autoupdate-history.json"
 }
 
 func NewAutoUpdateState() *AutoUpdateState {
-	return &AutoUpdateState{
+	s := &AutoUpdateState{
 		runs: []AutoUpdateRunResult{},
 		last: map[string]ContainerAutoStatus{},
+		path: autoUpdateHistoryPath(),
 	}
+	s.load()
+	return s
+}
+
+// historyFile 落盘结构（与内存字段一一对应）
+type historyFile struct {
+	Runs []AutoUpdateRunResult          `json:"runs"`
+	Last map[string]ContainerAutoStatus `json:"last"`
+}
+
+func (s *AutoUpdateState) load() {
+	b, err := os.ReadFile(s.path)
+	if err != nil {
+		return // 首次运行
+	}
+	var h historyFile
+	if err := json.Unmarshal(b, &h); err != nil {
+		logx.Errorf("解析自动更新历史失败(忽略): %v", err)
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if h.Runs != nil {
+		s.runs = h.Runs
+		if len(s.runs) > 30 {
+			s.runs = s.runs[:30]
+		}
+	}
+	if h.Last != nil {
+		s.last = h.Last
+	}
+}
+
+// persistLocked 原子写盘（临时文件 + rename，避免写一半被杀留下坏文件）；调用方持锁。
+// force=false 时节流：距上次写入 <2s 先跳过（SetContainer 高频调用；最终状态有 AddRun 兜底）。
+func (s *AutoUpdateState) persistLocked(force bool) {
+	if s.path == "" {
+		return
+	}
+	if !force && time.Since(s.lastSave) < 2*time.Second {
+		return
+	}
+	b, err := json.Marshal(historyFile{Runs: s.runs, Last: s.last})
+	if err != nil {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+		logx.Errorf("创建历史目录失败: %v", err)
+		return
+	}
+	tmp := s.path + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+		logx.Errorf("写自动更新历史失败: %v", err)
+		return
+	}
+	if err := os.Rename(tmp, s.path); err != nil {
+		logx.Errorf("替换自动更新历史失败: %v", err)
+	}
+	s.lastSave = time.Now()
 }
 
 // SetActive 登记本轮进行中的任务（run 开始时调用）
@@ -369,12 +439,14 @@ func (s *AutoUpdateState) AddRun(r AutoUpdateRunResult) {
 	if len(s.runs) > 30 {
 		s.runs = s.runs[:30]
 	}
+	s.persistLocked(true) // 运行记录是关键数据：每次都落盘，不节流
 }
 
 func (s *AutoUpdateState) SetContainer(name string, ok bool, message string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.last[name] = ContainerAutoStatus{Time: time.Now().Format("2006-01-02 15:04:05"), OK: ok, Message: message}
+	s.persistLocked(false) // 每台完成都会调：节流写，避免高频 IO
 }
 
 // Snapshot 返回状态快照（并发安全）
