@@ -45,6 +45,7 @@ type NotifyChannels struct {
 	Feishu     NotifyChannel `json:"feishu"`
 	Wecom      NotifyChannel `json:"wecom"`
 	Dingtalk   NotifyChannel `json:"dingtalk"`
+	QQ         NotifyChannel `json:"qq"`
 	Bark       NotifyChannel `json:"bark"`
 	ServerChan NotifyChannel `json:"serverchan"`
 	Telegram   NotifyChannel `json:"telegram"`
@@ -58,10 +59,10 @@ type NotifyResult struct {
 }
 
 // ChannelLabels 渠道显示名（顺序即发送顺序）
-var notifyOrder = []string{"feishu", "wecom", "dingtalk", "bark", "serverchan", "telegram", "webhook"}
+var notifyOrder = []string{"feishu", "wecom", "dingtalk", "qq", "bark", "serverchan", "telegram", "webhook"}
 
 var ChannelLabels = map[string]string{
-	"feishu": "飞书", "wecom": "企业微信", "dingtalk": "钉钉",
+	"feishu": "飞书", "wecom": "企业微信", "dingtalk": "钉钉", "qq": "QQ（机器人）",
 	"bark": "Bark", "serverchan": "Server酱", "telegram": "Telegram", "webhook": "自定义 Webhook",
 }
 
@@ -74,6 +75,8 @@ func (n NotifyChannels) ChannelByName(t string) NotifyChannel {
 		return n.Wecom
 	case "dingtalk":
 		return n.Dingtalk
+	case "qq":
+		return n.QQ
 	case "bark":
 		return n.Bark
 	case "serverchan":
@@ -170,6 +173,9 @@ func SendChannel(channelType string, c NotifyChannel, title, text string) Notify
 			return fail(err.Error())
 		}
 		return ok()
+
+	case "qq":
+		return sendQQBot(c, title, text)
 
 	case "bark":
 		if c.Key == "" {
