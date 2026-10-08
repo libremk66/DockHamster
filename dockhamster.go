@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/libremk66/DockHamster/internal/config"
 	"github.com/libremk66/DockHamster/internal/handler"
@@ -16,8 +17,8 @@ import (
 	"github.com/libremk66/DockHamster/internal/module"
 	"github.com/libremk66/DockHamster/internal/selfupdate"
 	"github.com/libremk66/DockHamster/internal/svc"
-	"github.com/libremk66/DockHamster/internal/watchdog"
 	"github.com/libremk66/DockHamster/internal/utiles"
+	"github.com/libremk66/DockHamster/internal/watchdog"
 	"github.com/robfig/cron/v3"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -105,6 +106,16 @@ export const customImageLogos = {
 	go func() {
 		if _, _, cerr := utiles.CheckAllImageUpdates(ctx, "startup"); cerr != nil {
 			logx.Errorf("启动检查更新失败: %v", cerr)
+		}
+	}()
+
+	// 进度记录清理：已完成/失败且 15 分钟未更新的任务从内存移除（长期运行不缓涨）
+	go func() {
+		for {
+			time.Sleep(10 * time.Minute)
+			if n := ctx.PurgeFinishedProgress(15 * time.Minute); n > 0 {
+				logx.Infof("已清理 %d 条历史任务进度", n)
+			}
 		}
 	}()
 	corndanmu := cron.New(cron.WithParser(cron.NewParser(
