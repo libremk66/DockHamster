@@ -8,9 +8,6 @@ type ContainerRenameReq struct {
 	NewName string `form:"newName"`
 }
 
-type ContainerRestoreReq struct {
-	Filename string `json:"filename"`
-}
 
 type ContainerUpdateReq struct {
 	IdReq
@@ -78,9 +75,6 @@ type SnapshotPruneReq struct {
 	Keep int `json:"keep,optional"`
 }
 
-type DelContainerBackupReq struct {
-	Filename string `form:"filename"`
-}
 
 type DoLoginReq struct {
 	SecretKey string `form:"secret_key,optional"`

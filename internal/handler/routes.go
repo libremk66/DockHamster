@@ -75,31 +75,6 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			},
 			{
 				Method:  http.MethodGet,
-				Path:    "/container/backup",
-				Handler: container.BackupHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodGet,
-				Path:    "/container/backup2compose",
-				Handler: container.Backup2composeHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodDelete,
-				Path:    "/container/backups",
-				Handler: container.DelRestoreHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodPost,
-				Path:    "/container/backups/restore",
-				Handler: container.RestoreHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodGet,
-				Path:    "/container/listBackups",
-				Handler: container.ListBackupsHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodGet,
 				Path:    "/containers",
 				Handler: container.ContainersListHandler(serverCtx),
 			},
