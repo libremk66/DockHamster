@@ -98,6 +98,7 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 			result.Failed = append(result.Failed, module.AutoRunFailure{Name: pullRef, Error: "拉取失败: " + oneLine(err.Error())})
 			result.DurationSec = time.Since(start).Seconds()
 			serviceContext.AutoUpdateState.AddRun(result)
+			notifyAutoUpdate(serviceContext, result)
 			return
 		}
 		for _, t := range tasks {
@@ -121,6 +122,7 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 		result.DurationSec = float64(int(time.Since(start).Seconds()*10)) / 10
 		serviceContext.AutoUpdateState.AddRun(result)
 		logx.Infof("整组更新完成：%d 成功 / %d 失败 / 清理旧镜像 %d", len(result.Updated), len(result.Failed), result.CleanedImages)
+		notifyAutoUpdate(serviceContext, result)
 	}()
 
 	return tasks, nil

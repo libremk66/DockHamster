@@ -157,12 +157,10 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 	notifyAutoUpdate(serviceContext, result)
 }
 
-// notifyAutoUpdate 按设置发送飞书简报（有内容才发：有更新成功 或 有失败）
+// notifyAutoUpdate 按设置向所有已启用渠道发送更新简报（有内容才发：有更新成功 或 有失败）。
+// 渠道开关由通知设置里各渠道的 enabled 决定（module.SendNotify 内部过滤）。
 func notifyAutoUpdate(serviceContext *svc.ServiceContext, r module.AutoUpdateRunResult) {
 	settings := serviceContext.AutoUpdate.Get()
-	if settings.FeishuWebhook == "" {
-		return
-	}
 	hasResult := len(r.Updated) > 0 || len(r.Failed) > 0
 	if !hasResult {
 		return
@@ -187,6 +185,9 @@ func notifyAutoUpdate(serviceContext *svc.ServiceContext, r module.AutoUpdateRun
 // composeAutoUpdateMessage 生成通知标题与正文（正文不含标题行，各渠道自行拼接）
 func composeAutoUpdateMessage(r module.AutoUpdateRunResult) (title, text string) {
 	title = "🔄 DockHamster 自动更新 " + r.Time
+	if r.Trigger == "group" {
+		title = "🔄 DockHamster 整组更新 " + r.Time
+	}
 	var b strings.Builder
 	if len(r.Updated) > 0 {
 		b.WriteString(fmt.Sprintf("✅ 已更新 %d 个：%s\n", len(r.Updated), strings.Join(r.Updated, "、")))
