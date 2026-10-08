@@ -111,7 +111,22 @@ docker compose up -d
 # 浏览器打开 http://<你的主机>:12712 ，输入 secretKey 登录
 ```
 
-## 五、自动更新怎么用
+## 五、compose 容器更新
+
+由 docker compose 管理的容器（容器带 `com.docker.compose.*` labels）更新时自动走 compose 通道：`docker compose up -d --force-recreate --no-deps <service>`，只重建目标服务，不触碰同项目其他容器，compose labels 与配置保持一致不产生漂移。非 compose 容器仍走原有的 API 重建通道，无需任何配置。
+
+**部署要求**：面板容器需能读到 compose 文件并具备 `docker compose` 命令：
+
+1. 镜像已内置 compose plugin（自建镜像时确保安装 `docker-cli-compose`）
+2. 在 volumes 中挂载 compose 文件所在目录（面板按容器 labels 里记录的**宿主机原始路径**查找文件，挂载点需与宿主路径一致）：
+   ```yaml
+   volumes:
+     - <compose 项目所在目录>:<compose 项目所在目录>
+   ```
+3. compose 文件不可达时更新会明确报错（不会误删重建），按提示补挂载即可
+4. 若同一数据卷在宿主上有多个挂载视角，可用环境变量 `COMPOSE_ALT_ROOTS`（逗号分隔前缀）配置兜底探测；未配置时不启用
+
+## 六、自动更新怎么用
 
 1. 打开侧栏 **「自动更新」** 页：勾选要自动更新的容器（或勾"全部容器"）、设定 cron 计划（默认每天 04:00）、按需配置通知渠道
 2. 或直接在**容器页**列表里点某个容器的**自动更新开关**快捷加入白名单
@@ -124,7 +139,7 @@ docker compose up -d
 
 💡 通知卡片里还有一个默认开启的 **「容器异常告警」** 开关：容器意外退出 / 被 OOM / 反复重启会走同一套通知渠道推送（面板主动操作不误报）。
 
-## 六、上游与致谢
+## 七、上游与致谢
 
 DockHamster 的前身是原项目的一个增强分支，现已作为独立项目维护：
 
@@ -133,7 +148,7 @@ DockHamster 的前身是原项目的一个增强分支，现已作为独立项�
 - 本项目的多项通用修复已向上游提交 PR（[#166](https://github.com/onlyLTY/dockerCopilot/pull/166)），欢迎去官方 issue 下 +1
 - 完整功能与 API 说明见 [FEATURES.md](./FEATURES.md)；上游原始 README 备份见 [README.upstream.md](./README.upstream.md)
 
-## 七、许可
+## 八、许可
 
 - 本项目遵循 **AGPL-3.0**（与上游一致，见 [LICENSE](./LICENSE)）。
 - **完整源码即本仓库**：使用本镜像通过网络提供服务时，由此即可获取对应源码（AGPL §13）。
