@@ -32,6 +32,12 @@ type NotifyChannel struct {
 	Method       string `json:"method,optional"`       // 自定义 Webhook 方法 POST/GET
 	Headers      string `json:"headers,optional"`      // 自定义请求头（JSON 文本）
 	BodyTemplate string `json:"bodyTemplate,optional"` // 自定义 body 模板（{title} {text}）
+	// 飞书「应用模式」（App ID/Secret；填了就走应用推送，与群机器人 Webhook 二选一）
+	AppID         string `json:"appId,optional"`         // 自建应用 App ID
+	AppSecret     string `json:"appSecret,optional"`     // 自建应用 App Secret
+	ReceiveID     string `json:"receiveId,optional"`     // 接收者 ID（open_id/user_id/email/群 chat_id）
+	ReceiveIDType string `json:"receiveIdType,optional"` // 接收者类型，默认 open_id
+	Domain        string `json:"domain,optional"`        // 可选：开放平台域名（Lark 国际版填 https://open.larksuite.com）
 }
 
 // NotifyChannels 全部渠道
@@ -104,8 +110,12 @@ func SendChannel(channelType string, c NotifyChannel, title, text string) Notify
 
 	switch channelType {
 	case "feishu":
+		// 应用模式（App ID/Secret）：填了就优先走应用推送
+		if strings.TrimSpace(c.AppID) != "" || strings.TrimSpace(c.AppSecret) != "" {
+			return sendFeishuApp(c, title, text)
+		}
 		if c.Webhook == "" {
-			return fail("未填 Webhook 地址")
+			return fail("未填 Webhook 地址（或改用 App ID/App Secret 应用模式）")
 		}
 		body := map[string]interface{}{
 			"msg_type": "text",
