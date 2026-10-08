@@ -3,6 +3,7 @@ package utiles
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
@@ -76,11 +77,22 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	// 更新期间旧容器会被停止/改名，让守护模块暂时静默
 	NoteMaintenance(serviceContext, name, 15*time.Minute)
 
-	// compose 管理的容器走 compose 通道重建（保持 labels/配置漂移一致），失败不回退
-	// API 重建——两通道行为差异大，静默混用会造成 compose 配置漂移，宁可让用户看到明确错误。
+	// compose 管理的容器走 compose 通道重建（保持 labels/配置一致，避免配置漂移）。
+	// 例外：面板侧 compose 环境不可用（未装 compose 命令 / compose 文件未挂载）→
+	// 回退 API 重建通道，但**显式提示**（不静默：用户可据此补挂载以恢复 compose 通道）。
+	// compose up 真正执行失败（拉取失败/重建失败）仍按错误返回，不回退。
 	if meta, mErr := ComposeMetaOfContainer(serviceContext, id); mErr == nil && meta.IsManaged {
 		logx.Infof("容器 %s 由 compose 管理（%s），分流到 compose 更新通道", name, meta.UpdateRef())
-		return OldImageOutcome{}, UpdateContainerViaCompose(serviceContext, meta, imageNameAndTag, opts.SkipPull, taskID)
+		cerr := UpdateContainerViaCompose(serviceContext, meta, imageNameAndTag, opts.SkipPull, taskID)
+		if cerr == nil || !errors.Is(cerr, ErrComposeUnavailable) {
+			return OldImageOutcome{}, cerr
+		}
+		logx.Infof("容器 %s compose 通道不可用（%v），回退 API 重建", name, cerr)
+		oldTaskProgress.Message = "compose 环境不可用，已回退 API 重建"
+		oldTaskProgress.DetailMsg = cerr.Error()
+		oldTaskProgress.Percentage = 5
+		oldTaskProgress.IsDone = false
+		serviceContext.UpdateProgress(taskID, oldTaskProgress)
 	}
 
 	if !opts.SkipPull {

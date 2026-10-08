@@ -1,6 +1,7 @@
 package utiles
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -69,6 +70,10 @@ func TestResolveConfigFiles(t *testing.T) {
 		_, err := ResolveConfigFiles([]string{"/no-such-root-xyz/missing.yml"})
 		if err == nil {
 			t.Fatal("期望错误，实际为 nil")
+		}
+		// 必须带 ErrComposeUnavailable 标记：调用方据此回退 API 重建通道（环境不可用 ≠ 执行失败）
+		if !errors.Is(err, ErrComposeUnavailable) {
+			t.Fatalf("错误未标记 ErrComposeUnavailable: %v", err)
 		}
 	})
 
