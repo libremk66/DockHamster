@@ -62,6 +62,7 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 		policies = append(policies, settings.ResolveOldImagePolicy(t.name))
 	}
 	opts := UpdateOptions{
+		Trigger:         "group",
 		SkipPull:        true, // 统一拉取
 		DelOldContainer: os.Getenv("DelOldContainer") != "false",
 		DeleteOldImage:  settings.DeleteOldImage,

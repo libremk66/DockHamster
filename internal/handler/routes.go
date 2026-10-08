@@ -187,6 +187,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Handler: autoupdate.StatusHandler(serverCtx),
 			},
 			{
+				Method:  http.MethodGet,
+				Path:    "/tasks",
+				Handler: autoupdate.TasksHandler(serverCtx),
+			},
+			{
 				Method:  http.MethodPost,
 				Path:    "/autoUpdate/testNotify",
 				Handler: autoupdate.TestNotifyHandler(serverCtx),

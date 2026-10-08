@@ -222,6 +222,9 @@ service dockerCopilot {
 	@handler status
 	get /autoUpdate/status returns (Resp)
 
+	@handler tasks
+	get /tasks returns (Resp)
+
 	@handler testNotify
 	post /autoUpdate/testNotify returns (Resp)
 
