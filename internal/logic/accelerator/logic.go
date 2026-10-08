@@ -153,6 +153,7 @@ func (l *AcceleratorLogic) Pull(source, imageRef string) (*types.Resp, error) {
 				logx.Errorf("加速拉取 panic: %v", r)
 			}
 		}()
+		l.svcCtx.InitTask(taskID, imageRef, "pull", "accelerator")
 		if err := utiles.PullImageViaMirror(l.svcCtx, taskID, source, imageRef); err != nil {
 			err = utiles.FriendlyPullError(imageRef, err)
 			p, _ := l.svcCtx.GetProgress(taskID)

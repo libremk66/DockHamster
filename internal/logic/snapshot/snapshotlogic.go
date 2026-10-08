@@ -153,6 +153,7 @@ func (l *SnapshotLogic) Rollback(req *types.SnapshotRollbackReq) (resp *types.Re
 			DelOldContainer: true,
 			OldImagePolicy:  "keep", // 当前版本已打回滚前快照，这里显式不处理
 			SnapshotOptions: opts,
+			Trigger:         "rollback",
 		}
 		if err := utiles.UpdateContainer(l.svcCtx, inspected.ID, req.ContainerName, originalRef, uopts, taskID); err != nil {
 			l.Errorf("回滚重建容器失败: %v", err)

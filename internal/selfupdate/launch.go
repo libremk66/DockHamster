@@ -31,6 +31,7 @@ func Launch(svcCtx *svc.ServiceContext, selfID, name, imageRef, taskID string) e
 		})
 	}
 
+	svcCtx.InitTask(taskID, imageRef, "selfupdate", "selfupdate")
 	progress(5, "正在拉取新镜像 "+imageRef, false)
 	if err := utiles.PullImageForUpdate(svcCtx, taskID, imageRef); err != nil {
 		progress(100, "拉取镜像失败: "+err.Error(), true)

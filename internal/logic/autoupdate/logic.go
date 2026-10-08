@@ -181,6 +181,15 @@ func (l *AutoUpdateLogic) Status() (*types.Resp, error) {
 	return resp, nil
 }
 
+// Tasks 「任务」页：列出全部任务（进行中 + 保留期内的已完成/失败）
+func (l *AutoUpdateLogic) Tasks() (*types.Resp, error) {
+	resp := &types.Resp{Code: 200, Msg: "success"}
+	resp.Data = map[string]interface{}{
+		"tasks": l.svcCtx.ListTasks(),
+	}
+	return resp, nil
+}
+
 // TestNotify 发送一条渠道测试消息（draft 为前端当前表单值；为空则用已保存配置）
 func (l *AutoUpdateLogic) TestNotify(channel string, draft *module.NotifyChannel) (*types.Resp, error) {
 	resp := &types.Resp{}

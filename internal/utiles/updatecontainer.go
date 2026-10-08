@@ -24,6 +24,8 @@ type UpdateOptions struct {
 	OldImagePolicy string
 	// 快照参数（仅策略为 snapshot 时使用）
 	SnapshotOptions SnapshotOptions
+	// Trigger 触发来源（「任务」页展示用）：container | autoupdate | group | rollback
+	Trigger string
 }
 
 // UpdateContainer 更新单个容器（UI「更新」按钮与回滚共用入口）
@@ -47,6 +49,8 @@ func (o UpdateOptions) resolvePolicy() string {
 // updateContainerCore 更新容器；返回旧镜像处置结果（是否清理 / 快照引用）。
 func updateContainerCore(serviceContext *svc.ServiceContext, id string, name string, imageNameAndTag string, opts UpdateOptions, taskID string) (OldImageOutcome, error) {
 	ctx := context.Background()
+	// 「任务」页元数据：类型=更新，来源=触发入口（容器页/自动更新/整组/回滚）
+	serviceContext.InitTask(taskID, name, "update", opts.Trigger)
 	serviceContext.UpdateProgress(taskID, svc.TaskProgress{
 		TaskID:     taskID,
 		Percentage: 0,

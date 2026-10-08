@@ -102,6 +102,7 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 		DelOldContainer: delOldContainer,
 		DeleteOldImage:  settings.DeleteOldImage,
 		SnapshotOptions: SnapshotOptionsFromSettings(settings),
+		Trigger:         "autoupdate",
 	}
 
 	// 预生成任务 ID 并登记为"进行中"，供 status 接口实时展示

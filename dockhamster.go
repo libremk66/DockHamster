@@ -109,11 +109,11 @@ export const customImageLogos = {
 		}
 	}()
 
-	// 进度记录清理：已完成/失败且 15 分钟未更新的任务从内存移除（长期运行不缓涨）
+	// 进度记录清理：已完成/失败的任务保留 2 小时（「任务」页可回看），之后从内存移除
 	go func() {
 		for {
 			time.Sleep(10 * time.Minute)
-			if n := ctx.PurgeFinishedProgress(15 * time.Minute); n > 0 {
+			if n := ctx.PurgeFinishedProgress(2 * time.Hour); n > 0 {
 				logx.Infof("已清理 %d 条历史任务进度", n)
 			}
 		}

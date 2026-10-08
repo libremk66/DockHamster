@@ -59,6 +59,7 @@ func (l *UpdateLogic) Update(req *types.ContainerUpdateReq) (resp *types.Resp, e
 			DeleteOldImage:  settings.DeleteOldImage,
 			OldImagePolicy:  settings.ResolveOldImagePolicy(req.ContainerName),
 			SnapshotOptions: utiles.SnapshotOptionsFromSettings(settings),
+			Trigger:         "container",
 		}
 		err := utiles.UpdateContainer(l.svcCtx, req.Id, req.ContainerName, imageNameAndTag, opts, taskID)
 		if err != nil {

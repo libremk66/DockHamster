@@ -14,6 +14,7 @@ import (
 
 func RestoreContainer(ctx *svc.ServiceContext, filename string, taskID string) error {
 	var backupList []string
+	ctx.InitTask(taskID, "备份还原", "restore", "backup")
 	oldProgress := svc.TaskProgress{
 		TaskID:     taskID,
 		Percentage: 0,
