@@ -2,6 +2,7 @@ package utiles
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,6 +17,11 @@ import (
 
 // composeExecTimeout 单个 compose 操作的超时（拉镜像可能较慢）
 const composeExecTimeout = 10 * time.Minute
+
+// ErrComposeUnavailable 标记"面板侧 compose 环境不具备"：容器内没有 compose 命令，
+// 或 compose 文件在面板容器里不可达（未挂载）。调用方据此**回退 API 重建通道**并显式提示；
+// 注意只涵盖"环境不可用"——compose up 真正执行失败仍按错误处理，不回退（避免配置漂移）。
+var ErrComposeUnavailable = errors.New("compose 通道不可用")
 
 // composeBinary 探测面板运行环境内可用的 compose 命令；
 // 优先 compose plugin（docker compose），退回独立二进制（docker-compose）
@@ -43,7 +49,7 @@ func composeBinary() (bin string, subcmd []string, err error) {
 			strings.TrimSpace(string(out)))
 		return path, c.subcmd, nil
 	}
-	return "", nil, fmt.Errorf("面板容器内未找到 docker compose / docker-compose")
+	return "", nil, fmt.Errorf("%w：面板容器内未找到 docker compose / docker-compose", ErrComposeUnavailable)
 }
 
 // ResolveConfigFiles 将 compose 文件路径解析为面板容器内可达的路径。
@@ -85,7 +91,7 @@ func ResolveConfigFiles(paths []string) ([]string, error) {
 			}
 		}
 		if alt == "" {
-			return nil, fmt.Errorf("compose 文件不可达: %s（面板容器需挂载该路径才能执行 compose 更新）", p)
+			return nil, fmt.Errorf("%w：compose 文件不可达 %s（面板容器需挂载该路径，或用 COMPOSE_ALT_ROOTS 配置备用前缀）", ErrComposeUnavailable, p)
 		}
 		logx.Infof("compose 文件路径解析: %s -> %s", p, alt)
 		resolved[i] = alt

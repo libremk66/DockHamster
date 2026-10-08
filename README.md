@@ -123,7 +123,7 @@ docker compose up -d
    volumes:
      - <compose 项目所在目录>:<compose 项目所在目录>
    ```
-3. compose 文件不可达时更新会明确报错（不会误删重建），按提示补挂载即可
+3. compose 环境不可用时（未装 compose 命令 / compose 文件未挂载）更新会**自动回退 API 重建通道**，并在更新进度里明确提示——功能不会中断，但会有 compose 配置漂移风险，按提示补挂载即可恢复 compose 通道；compose 命令真正执行失败则按错误返回、不回退
 4. 若同一数据卷在宿主上有多个挂载视角，可用环境变量 `COMPOSE_ALT_ROOTS`（逗号分隔前缀）配置兜底探测；未配置时不启用
 
 ## 六、自动更新怎么用
