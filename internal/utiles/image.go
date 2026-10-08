@@ -32,11 +32,41 @@ func GetImagesList(ctx *svc.ServiceContext) ([]MyType.Image, error) {
 	if err != nil {
 		return imagesList, err
 	}
+	markChildImages(ctx, imagesList)
 	return imagesList, nil
+}
+
+// markChildImages 标记被其他镜像作为基础镜像引用的镜像（本地构建产物的父镜像）。
+// 此类镜像即使无容器使用也无法删除（daemon 拒绝：image has dependent child images）。
+func markChildImages(ctx *svc.ServiceContext, imagesList []MyType.Image) {
+	parentSet := imageParentSet(ctx)
+	for i := range imagesList {
+		if parentSet[imagesList[i].ID] {
+			imagesList[i].HasChildren = true
+		}
+	}
+}
+
+// imageParentSet 收集所有镜像的父镜像 ID 集合
+func imageParentSet(ctx *svc.ServiceContext) map[string]bool {
+	parents := make(map[string]bool)
+	list, err := ctx.DockerClient.ImageList(context.Background(), image.ListOptions{})
+	if err != nil {
+		return parents
+	}
+	for _, img := range list {
+		ins, _, err := ctx.DockerClient.ImageInspectWithRaw(context.Background(), img.ID)
+		if err != nil || ins.Parent == "" {
+			continue
+		}
+		parents[ins.Parent] = true
+	}
+	return parents
 }
 
 func splitImageNameAndTag(imagesList []MyType.Image) []MyType.Image {
 	for i, imageInfo := range imagesList {
+		imagesList[i].Tags = imageInfo.RepoTags
 		if len(imageInfo.RepoTags) != 0 {
 			imagesList[i].ImageName = strings.Split(imageInfo.RepoTags[0], ":")[0]
 			imagesList[i].ImageTag = strings.Split(imageInfo.RepoTags[0], ":")[1]

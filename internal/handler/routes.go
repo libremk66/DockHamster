@@ -9,6 +9,7 @@ import (
 	accelerator "github.com/libremk66/DockHamster/internal/handler/accelerator"
 	auth "github.com/libremk66/DockHamster/internal/handler/auth"
 	autoupdate "github.com/libremk66/DockHamster/internal/handler/autoupdate"
+	compose "github.com/libremk66/DockHamster/internal/handler/compose"
 	container "github.com/libremk66/DockHamster/internal/handler/container"
 	favicon "github.com/libremk66/DockHamster/internal/handler/favicon"
 	icons "github.com/libremk66/DockHamster/internal/handler/icons"
@@ -332,6 +333,16 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Method:  http.MethodPost,
 				Path:    "/accelerator/pull",
 				Handler: accelerator.PullHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/container/:id/composefile",
+				Handler: compose.ComposeFileHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/container/:id/logs",
+				Handler: compose.LogsHandler(serverCtx),
 			},
 		},
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),

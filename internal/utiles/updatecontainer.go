@@ -76,6 +76,13 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	// 更新期间旧容器会被停止/改名，让守护模块暂时静默
 	NoteMaintenance(serviceContext, name, 15*time.Minute)
 
+	// compose 管理的容器走 compose 通道重建（保持 labels/配置漂移一致），失败不回退
+	// API 重建——两通道行为差异大，静默混用会造成 compose 配置漂移，宁可让用户看到明确错误。
+	if meta, mErr := ComposeMetaOfContainer(serviceContext, id); mErr == nil && meta.IsManaged {
+		logx.Infof("容器 %s 由 compose 管理（%s），分流到 compose 更新通道", name, meta.UpdateRef())
+		return OldImageOutcome{}, UpdateContainerViaCompose(serviceContext, meta, imageNameAndTag, opts.SkipPull, taskID)
+	}
+
 	if !opts.SkipPull {
 		oldTaskProgress.Message = "正在拉取新镜像"
 		oldTaskProgress.Percentage = 5

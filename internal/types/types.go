@@ -16,6 +16,8 @@ type ContainerUpdateReq struct {
 	IdReq
 	ImageNameAndTag string `form:"imageNameAndTag"`
 	ContainerName   string `form:"containerName"`
+	// SkipPull=true 时跳过拉取镜像，仅按（可能已修改的）配置重建容器
+	SkipPull bool `form:"skipPull,optional"`
 }
 
 type CreateContainerReq struct {
@@ -90,6 +92,10 @@ type GetProgressReq struct {
 
 type IdReq struct {
 	Id string `path:"id"`
+}
+
+type ComposeFileReq struct {
+	ContainerId string `path:"id"`
 }
 
 type LoginReq struct {
