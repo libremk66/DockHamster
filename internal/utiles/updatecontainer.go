@@ -105,6 +105,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 			oldTaskProgress.Message = "拉取镜像失败"
 			oldTaskProgress.DetailMsg = err.Error()
 			oldTaskProgress.IsDone = true
+			oldTaskProgress.Failed = true
 			serviceContext.UpdateProgress(taskID, oldTaskProgress)
 			logx.Errorf("Failed to pull image: %s", err)
 			return OldImageOutcome{}, err
@@ -136,6 +137,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 		oldTaskProgress.Message = "获取容器信息失败"
 		oldTaskProgress.DetailMsg = err.Error()
 		oldTaskProgress.IsDone = true
+		oldTaskProgress.Failed = true
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
 		logx.Error("获取容器信息失败" + err.Error())
 		return OldImageOutcome{}, err
@@ -156,6 +158,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 		oldTaskProgress.Message = "停止容器失败"
 		oldTaskProgress.DetailMsg = err.Error()
 		oldTaskProgress.IsDone = true
+		oldTaskProgress.Failed = true
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
 		return OldImageOutcome{}, err
 	}
@@ -174,6 +177,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 		oldTaskProgress.Message = "重命名旧容器失败"
 		oldTaskProgress.DetailMsg = err.Error()
 		oldTaskProgress.IsDone = true
+		oldTaskProgress.Failed = true
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
 		return OldImageOutcome{}, err
 	}
@@ -194,6 +198,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 		oldTaskProgress.Message = msg
 		oldTaskProgress.DetailMsg = msg
 		oldTaskProgress.IsDone = true
+		oldTaskProgress.Failed = true
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
 		logx.Errorf("更新 %s 失败并回滚: %s", name, reason)
 		return fmt.Errorf("%s", msg)
@@ -254,6 +259,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 			oldTaskProgress.Message = "删除旧容器失败"
 			oldTaskProgress.DetailMsg = err.Error()
 			oldTaskProgress.IsDone = true
+			oldTaskProgress.Failed = true
 			serviceContext.UpdateProgress(taskID, oldTaskProgress)
 			return OldImageOutcome{}, err
 		}
@@ -294,23 +300,139 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 
 // PullImageByRef 仅负责拉取镜像并消费进度流（批量更新时同一镜像只拉一次）
 // 配置了默认加速源时同样走加速（无进度展示）
-func PullImageByRef(serviceContext *svc.ServiceContext, ref string) error {
+// PullImageByRefForTasks 批量拉取入口：进度同步写到 taskIDs（组内每台可见），
+// taskIDs 为空时退化为"只拉取不写进度"。
+func PullImageByRefForTasks(serviceContext *svc.ServiceContext, ref string, taskIDs []string) error {
 	serviceContext.DockerClient.NegotiateAPIVersion(context.Background())
-	return PullImageForUpdate(serviceContext, "", ref)
+	return PullImageForTasks(serviceContext, taskIDs, ref)
 }
 
-func decodePullResp(reader io.ReadCloser, ctx *svc.ServiceContext, taskID string) (err error) {
+// ---------- 拉取进度（分层聚合 + 速度） ----------
+
+// 拉取阶段在总进度里的映射区间：5% ~ 60%（拉取通常是大头）
+const (
+	pullPctBase = 5
+	pullPctSpan = 0.55
+)
+
+// pullProgress 聚合 docker 拉取流的分层进度：
+//   - 百分比按各层"已下载/总字节"累计 —— 不再逐层各自 0→100（进度条来回跳的根源）；
+//   - 层是陆续登记的（分母会长大），百分比做单调不回退处理；
+//   - 速度按 ≥1 秒采样 + 指数平滑，供 UI 显示 MB/s（停滞时能一眼看出是网络问题）。
+type pullProgress struct {
+	cur       map[string]int64
+	total     map[string]int64
+	lastBytes int64
+	lastAt    time.Time
+	speed     float64
+	maxPct    float64
+}
+
+func newPullProgress() *pullProgress {
+	return &pullProgress{cur: map[string]int64{}, total: map[string]int64{}}
+}
+
+// feed 吸收一条拉取流消息 →（整体百分比 0-100，细节文案）；无总量信息时返回状态文本
+func (p *pullProgress) feed(msg dockerMsgType.JSONMessage) (float64, string) {
+	if id := msg.ID; id != "" {
+		if msg.Progress != nil && msg.Progress.Total > 0 {
+			p.total[id] = msg.Progress.Total
+			if c := msg.Progress.Current; c > 0 {
+				p.cur[id] = c
+			}
+		}
+		switch msg.Status {
+		case "Pull complete", "Download complete", "Already exists":
+			if t, ok := p.total[id]; ok {
+				p.cur[id] = t
+			}
+		}
+	}
+	var sumCur, sumTotal int64
+	for id, t := range p.total {
+		sumTotal += t
+		if c := p.cur[id]; c > 0 {
+			sumCur += c
+		}
+	}
+
+	// 速度采样：≥1s 一次；分母变大导致 sumCur 回退时不计负速度
+	now := time.Now()
+	if p.lastAt.IsZero() {
+		p.lastAt, p.lastBytes = now, sumCur
+	} else if d := now.Sub(p.lastAt); d >= time.Second {
+		delta := sumCur - p.lastBytes
+		if delta < 0 {
+			delta = 0
+		}
+		inst := float64(delta) / d.Seconds()
+		if p.speed == 0 {
+			p.speed = inst
+		} else {
+			p.speed = 0.4*inst + 0.6*p.speed
+		}
+		p.lastAt, p.lastBytes = now, sumCur
+	}
+
+	if sumTotal <= 0 {
+		return 0, strings.TrimSpace(msg.Status)
+	}
+	pct := float64(sumCur) / float64(sumTotal) * 100
+	if pct < p.maxPct {
+		pct = p.maxPct // 新层登记会拉大分母：百分比只进不退
+	} else {
+		p.maxPct = pct
+	}
+	if pct > 100 {
+		pct = 100
+	}
+	detail := fmt.Sprintf("%s / %s", humanBytes(sumCur), humanBytes(sumTotal))
+	if p.speed > 0 {
+		detail += " · " + humanBytes(int64(p.speed)) + "/s"
+	}
+	if s := strings.TrimSpace(msg.Status); s != "" && s != "Downloading" {
+		detail = s + " · " + detail
+	}
+	return pct, detail
+}
+
+// decodePullResp 消费拉取进度流：聚合后的总进度 + 速度写到 taskIDs 里的每个任务
+// （组内多台共用一次拉取时，每台的行都显示同一进度）。
+func decodePullResp(reader io.ReadCloser, ctx *svc.ServiceContext, taskIDs []string) (err error) {
 	defer func() { _ = reader.Close() }()
 	decoder := json.NewDecoder(reader)
-	var oldTaskProgress, result = ctx.GetProgress(taskID)
-	if !result {
-		oldTaskProgress = svc.TaskProgress{
-			Percentage: 0,
-			Name:       "",
-			Message:    "",
-			DetailMsg:  "",
-			IsDone:     false,
+	pp := newPullProgress()
+	// 承接外层已设置的阶段文案（如"正在拉取新镜像"）
+	stageMsg := "正在拉取镜像"
+	for _, id := range taskIDs {
+		if p, ok := ctx.GetProgress(id); ok && p.Message != "" {
+			stageMsg = p.Message
+			break
 		}
+	}
+	write := func(pct int, detail string, done, failed bool, message string) {
+		for _, taskID := range taskIDs {
+			if taskID == "" {
+				continue
+			}
+			p, ok := ctx.GetProgress(taskID)
+			if !ok {
+				p = svc.TaskProgress{TaskID: taskID}
+			}
+			p.TaskID = taskID
+			p.Percentage = pct
+			if message != "" {
+				p.Message = message
+			}
+			p.DetailMsg = detail
+			p.IsDone = done
+			p.Failed = failed
+			ctx.UpdateProgress(taskID, p)
+		}
+	}
+	fail := func(reason string) error {
+		write(25, reason, true, true, "拉取镜像失败")
+		return fmt.Errorf("拉取镜像失败: %s", reason)
 	}
 	for {
 		var msg dockerMsgType.JSONMessage
@@ -318,44 +440,18 @@ func decodePullResp(reader io.ReadCloser, ctx *svc.ServiceContext, taskID string
 			if err == io.EOF {
 				return nil
 			}
-			oldTaskProgress.Message = "拉取镜像失败"
-			oldTaskProgress.DetailMsg = err.Error()
-			oldTaskProgress.Percentage = 25
-			oldTaskProgress.IsDone = true
-			ctx.UpdateProgress(taskID, oldTaskProgress)
 			logx.Errorf("Failed to decode pull image response: %s", err)
-			return fmt.Errorf("拉取镜像失败: %w", err)
+			return fail(err.Error())
 		}
-		// Print the progress or error information from the response
 		if msg.Error != nil {
-			oldTaskProgress.Message = "拉取镜像失败"
-			oldTaskProgress.DetailMsg = msg.Error.Error()
-			oldTaskProgress.Percentage = 25
-			oldTaskProgress.IsDone = true
-			ctx.UpdateProgress(taskID, oldTaskProgress)
 			logx.Errorf("Error: %s", msg.Error)
-			return fmt.Errorf("拉取镜像失败: %w", msg.Error)
-		} else {
-			var formattedMsg string
-			if msg.Progress != nil && msg.Progress.Total > 0 {
-				pct := float64(msg.Progress.Current) / float64(msg.Progress.Total) * 100
-				if pct > 100 {
-					pct = 100
-				}
-				// 拉取阶段映射到 5%~60%（拉取通常是大头）
-				oldTaskProgress.Percentage = 5 + int(pct*0.55)
-				formattedMsg = fmt.Sprintf("%s %s / %s（%.0f%%）", msg.Status,
-					humanBytes(msg.Progress.Current), humanBytes(msg.Progress.Total), pct)
-			} else {
-				formattedMsg = msg.Status
-				if oldTaskProgress.Percentage < 5 {
-					oldTaskProgress.Percentage = 5
-				}
-			}
-			oldTaskProgress.DetailMsg = formattedMsg
-			ctx.UpdateProgress(taskID, oldTaskProgress)
-			logx.Infof("拉取镜像进度\t %s: %s\n", msg.Status, msg.Progress)
+			return fail(msg.Error.Error())
 		}
+		pct, detail := pp.feed(msg)
+		if detail == "" {
+			continue
+		}
+		write(pullPctBase+int(pct*pullPctSpan), detail, false, false, stageMsg)
 	}
 }
 

@@ -93,7 +93,12 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 			Failed:  []module.AutoRunFailure{},
 		}
 		logx.Infof("整组更新：拉取 %s（%d 个容器共用）", pullRef, len(tasks))
-		if err := PullImageByRef(serviceContext, pullRef); err != nil {
+		// 组内每台的 taskID 都带上：拉取进度对每一台的行都可见
+		groupTaskIDs := make([]string, 0, len(tasks))
+		for _, t := range tasks {
+			groupTaskIDs = append(groupTaskIDs, t.TaskID)
+		}
+		if err := PullImageByRefForTasks(serviceContext, pullRef, groupTaskIDs); err != nil {
 			logx.Errorf("整组更新：拉取 %s 失败：%v", pullRef, err)
 			result.Failed = append(result.Failed, module.AutoRunFailure{Name: pullRef, Error: "拉取失败: " + oneLine(err.Error())})
 			result.DurationSec = time.Since(start).Seconds()
