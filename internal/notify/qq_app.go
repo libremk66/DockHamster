@@ -1,4 +1,4 @@
-package module
+package notify
 
 // QQ 官方机器人推送（AppID / ClientSecret 模式）。
 // 流程：getAppAccessToken（内存缓存，提前 5 分钟刷新）→ POST /v2/groups|/v2/users/:id/messages
@@ -125,9 +125,9 @@ func qqHintFor(code int, message string) string {
 }
 
 // sendQQBot QQ 机器人推送：Markdown 优先，失败回退纯文本
-func sendQQBot(c NotifyChannel, title, text string) NotifyResult {
+func sendQQBot(c Channel, title, text string) Result {
 	label := ChannelLabels["qq"]
-	fail := func(err string) NotifyResult { return NotifyResult{Channel: label, OK: false, Error: err} }
+	fail := func(err string) Result { return Result{Channel: label, OK: false, Error: err} }
 
 	if strings.TrimSpace(c.AppID) == "" {
 		return fail("未填 AppID")
@@ -158,7 +158,7 @@ func sendQQBot(c NotifyChannel, title, text string) NotifyResult {
 		"msg_type": 2,
 	})
 	if _, err := qqRequest(qqAPIBase+path, token, string(mdBody)); err == nil {
-		return NotifyResult{Channel: label, OK: true}
+		return Result{Channel: label, OK: true}
 	} else {
 		mdErr := err
 		// ② 回退纯文本（msg_type=0；Markdown 未开通时必走这条）
@@ -169,6 +169,6 @@ func sendQQBot(c NotifyChannel, title, text string) NotifyResult {
 		if _, err2 := qqRequest(qqAPIBase+path, token, string(plainBody)); err2 != nil {
 			return fail(fmt.Sprintf("发送失败：%s（Markdown 模式：%s）", err2.Error(), mdErr.Error()))
 		}
-		return NotifyResult{Channel: label, OK: true}
+		return Result{Channel: label, OK: true}
 	}
 }

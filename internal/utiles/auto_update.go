@@ -3,6 +3,7 @@ package utiles
 import (
 	"context"
 	"fmt"
+	"github.com/libremk66/DockHamster/internal/notify"
 	"strings"
 	"time"
 
@@ -166,7 +167,7 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 }
 
 // notifyAutoUpdate 按设置向所有已启用渠道发送更新简报（有内容才发：有更新成功 或 有失败）。
-// 渠道开关由通知设置里各渠道的 enabled 决定（module.SendNotify 内部过滤）。
+// 渠道开关由通知设置里各渠道的 enabled 决定（notify.Send 内部过滤）。
 func notifyAutoUpdate(serviceContext *svc.ServiceContext, r module.AutoUpdateRunResult) {
 	settings := serviceContext.AutoUpdate.Get()
 	hasResult := len(r.Updated) > 0 || len(r.Failed) > 0
@@ -180,7 +181,7 @@ func notifyAutoUpdate(serviceContext *svc.ServiceContext, r module.AutoUpdateRun
 		return
 	}
 	title, text := composeAutoUpdateMessage(r)
-	results := module.SendNotify(settings.Notify, title, text)
+	results := notify.Send(settings.Notify, title, text)
 	for _, res := range results {
 		if res.OK {
 			logx.Infof("通知已发送: %s", res.Channel)

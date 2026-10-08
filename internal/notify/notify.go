@@ -1,4 +1,4 @@
-package module
+package notify
 
 import (
 	"bytes"
@@ -16,9 +16,9 @@ import (
 
 // ===== 通知渠道（移植自音乐仓鼠的通知模块：7 渠道 / 单向推送 / 失败不影响主流程） =====
 
-// NotifyChannel 单个渠道配置（字段按渠道选用）
+// Channel 单个渠道配置（字段按渠道选用）
 // 注意：tag 用 go-zero 的 ,optional（不能用 omitempty —— 输出省略后请求校验会当必填拒绝）
-type NotifyChannel struct {
+type Channel struct {
 	Enabled      bool   `json:"enabled"`
 	Webhook      string `json:"webhook,optional"`      // 飞书/企业微信/钉钉 群机器人地址
 	Secret       string `json:"secret,optional"`       // 飞书/钉钉 加签密钥（可选）
@@ -41,26 +41,26 @@ type NotifyChannel struct {
 	Domain        string `json:"domain,optional"`        // 可选：开放平台域名（Lark 国际版填 https://open.larksuite.com）
 }
 
-// NotifyChannels 全部渠道
-type NotifyChannels struct {
-	Feishu     NotifyChannel `json:"feishu"`
-	Wecom      NotifyChannel `json:"wecom"`
-	Dingtalk   NotifyChannel `json:"dingtalk"`
-	QQ         NotifyChannel `json:"qq"`
-	Bark       NotifyChannel `json:"bark"`
-	ServerChan NotifyChannel `json:"serverchan"`
-	Telegram   NotifyChannel `json:"telegram"`
-	Webhook    NotifyChannel `json:"webhook"`
+// Channels 全部渠道
+type Channels struct {
+	Feishu     Channel `json:"feishu"`
+	Wecom      Channel `json:"wecom"`
+	Dingtalk   Channel `json:"dingtalk"`
+	QQ         Channel `json:"qq"`
+	Bark       Channel `json:"bark"`
+	ServerChan Channel `json:"serverchan"`
+	Telegram   Channel `json:"telegram"`
+	Webhook    Channel `json:"webhook"`
 }
 
-type NotifyResult struct {
+type Result struct {
 	Channel string `json:"channel"`
 	OK      bool   `json:"ok"`
 	Error   string `json:"error,omitempty"`
 }
 
 // ChannelLabels 渠道显示名（顺序即发送顺序）
-var notifyOrder = []string{"feishu", "wecom", "dingtalk", "qq", "bark", "serverchan", "telegram", "webhook"}
+var ChannelOrder = []string{"feishu", "wecom", "dingtalk", "qq", "bark", "serverchan", "telegram", "webhook"}
 
 var ChannelLabels = map[string]string{
 	"feishu": "飞书", "wecom": "企业微信", "dingtalk": "钉钉", "qq": "QQ（机器人）",
@@ -68,7 +68,7 @@ var ChannelLabels = map[string]string{
 }
 
 // ChannelByName 取某渠道的配置
-func (n NotifyChannels) ChannelByName(t string) NotifyChannel {
+func (n Channels) ByName(t string) Channel {
 	switch t {
 	case "feishu":
 		return n.Feishu
@@ -87,30 +87,30 @@ func (n NotifyChannels) ChannelByName(t string) NotifyChannel {
 	case "webhook":
 		return n.Webhook
 	}
-	return NotifyChannel{}
+	return Channel{}
 }
 
 // SendNotify 向所有已启用渠道发送；逐渠道独立，失败不影响其他渠道
-func SendNotify(channels NotifyChannels, title, text string) []NotifyResult {
-	var out []NotifyResult
-	for _, t := range notifyOrder {
-		ch := channels.ChannelByName(t)
+func Send(channels Channels, title, text string) []Result {
+	var out []Result
+	for _, t := range ChannelOrder {
+		ch := channels.ByName(t)
 		if !ch.Enabled {
 			continue
 		}
-		out = append(out, SendChannel(t, ch, title, text))
+		out = append(out, SendOne(t, ch, title, text))
 	}
 	return out
 }
 
 // SendChannel 单渠道发送（测试接口也走这里）
-func SendChannel(channelType string, c NotifyChannel, title, text string) NotifyResult {
+func SendOne(channelType string, c Channel, title, text string) Result {
 	label := ChannelLabels[channelType]
 	if label == "" {
 		label = channelType
 	}
-	fail := func(err string) NotifyResult { return NotifyResult{Channel: label, OK: false, Error: err} }
-	ok := func() NotifyResult { return NotifyResult{Channel: label, OK: true} }
+	fail := func(err string) Result { return Result{Channel: label, OK: false, Error: err} }
+	ok := func() Result { return Result{Channel: label, OK: true} }
 
 	switch channelType {
 	case "feishu":

@@ -8,7 +8,6 @@ type ContainerRenameReq struct {
 	NewName string `form:"newName"`
 }
 
-
 type ContainerUpdateReq struct {
 	IdReq
 	ImageNameAndTag string `form:"imageNameAndTag"`
@@ -74,7 +73,6 @@ type SnapshotRollbackReq struct {
 type SnapshotPruneReq struct {
 	Keep int `json:"keep,optional"`
 }
-
 
 type DoLoginReq struct {
 	SecretKey string `form:"secret_key,optional"`
