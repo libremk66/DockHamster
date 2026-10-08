@@ -52,3 +52,34 @@ func TestJSONValueHelpers(t *testing.T) {
 		t.Fatal("strOf 取值异常")
 	}
 }
+
+// QQ 渠道：字段缺失直接报错；常见错误码映射人话提示
+func TestSendQQBotValidation(t *testing.T) {
+	cases := []struct {
+		name string
+		ch   NotifyChannel
+		want string
+	}{
+		{"缺 AppID", NotifyChannel{AppSecret: "s", ReceiveID: "r"}, "未填 AppID"},
+		{"缺 ClientSecret", NotifyChannel{AppID: "a", ReceiveID: "r"}, "未填 ClientSecret"},
+		{"缺目标", NotifyChannel{AppID: "a", AppSecret: "s"}, "未填接收目标"},
+	}
+	for _, tc := range cases {
+		res := sendQQBot(tc.ch, "标题", "正文")
+		if res.OK || !strings.Contains(res.Error, tc.want) {
+			t.Fatalf("%s：res=%+v，想要包含 %q", tc.name, res, tc.want)
+		}
+	}
+}
+
+func TestQQHintFor(t *testing.T) {
+	if !strings.Contains(qqHintFor(0, "主动消息条数已达上限"), "每月限 4 条") {
+		t.Fatal("配额类错误未附提示")
+	}
+	if !strings.Contains(qqHintFor(11244, "x"), "Markdown") {
+		t.Fatal("Markdown 类错误未附提示")
+	}
+	if qqHintFor(0, "别的错误") != "" {
+		t.Fatal("普通错误不应附提示")
+	}
+}

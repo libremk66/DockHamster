@@ -53,11 +53,12 @@
 - 旧镜像清理遵循引用计数保护，最后一个使用者更新完成后才真正删除
 - 定时自动更新里的"勾选白名单"是同一套机制：**共用镜像的容器建议都勾上**（详见第 1 节）
 
-### 4. 多渠道通知（7 个渠道）
+### 4. 多渠道通知（8 个渠道）
 
 - 更新流程结束后发送简报（有内容才发）：成功清单、失败原因、清理旧镜像数、耗时
-- 渠道：**飞书 / 企业微信 / 钉钉 / Bark / Server酱 / Telegram / 自定义 Webhook**
+- 渠道：**飞书 / 企业微信 / 钉钉 / QQ（官方机器人）/ Bark / Server酱 / Telegram / 自定义 Webhook**
   - 飞书支持两种模式（二选一）：**自建应用**（App ID + App Secret，消息为 Markdown 交互卡片、标题按内容自动红/绿/蓝着色；发送失败自动回退纯文本）或**群机器人 Webhook**（支持加签）
+  - QQ 走官方机器人（AppID + ClientSecret，Markdown 优先、失败回退纯文本）——⚠️ 官方限制：主动消息每月限 4 条/群、4 条/用户，且目标需先与机器人交互过
   - 钉钉支持「加签」密钥；企业微信自动按 2048 字节截断
   - Telegram 可自填 API 反代地址；自定义 Webhook 支持 GET/POST、自定义请求头与 body 模板（`{title}` `{text}` 变量）
 - 「自动更新」页逐渠道勾选启用、每渠道**独立测试发送**（用当前表单值直接发，无需先保存）
@@ -241,7 +242,7 @@ checksums.txt      校验和（sha256sum -c 可验证完整性）
 
 ```
 internal/module/autosettings.go    新增：设置存储 + 运行状态
-internal/module/notify.go          新增：多渠道通知发送（7 渠道；飞书支持自建应用模式）
+internal/module/notify.go          新增：多渠道通知发送（8 渠道；飞书/QQ 支持官方应用模式）
 internal/module/notify_feishu_app.go 飞书应用推送（tenant_access_token + 交互卡片，失败回退文本）
 internal/utiles/auto_update.go     新增：白名单自动更新（批量、按镜像分组）
 internal/utiles/group_update.go    新增：整组更新
