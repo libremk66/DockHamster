@@ -3,12 +3,29 @@ package utiles
 import (
 	"context"
 	"fmt"
+	"log"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/docker/docker/api/types/image"
 	"github.com/libremk66/DockHamster/internal/svc"
 	MyType "github.com/libremk66/DockHamster/internal/types"
-	"log"
-	"strings"
 )
+
+// imageParentCacheTTL 父镜像集合的缓存时长。
+// 父镜像关系只在镜像构建/删除时变化，而镜像列表会被前端高频轮询，
+// 缓存可避免每次列表都逐个 inspect（悬空镜像多时开销显著）。
+const imageParentCacheTTL = 30 * time.Second
+
+var (
+	imageParentCacheMu      sync.RWMutex
+	imageParentCache        map[string]bool
+	imageParentCacheExpires time.Time
+)
+
+// imageParentScan 全量扫描镜像、收集父镜像 ID 集合；抽为变量便于测试替换。
+var imageParentScan = scanImageParentSet
 
 func GetImagesList(ctx *svc.ServiceContext) ([]MyType.Image, error) {
 	var imagesList []MyType.Image
@@ -47,8 +64,27 @@ func markChildImages(ctx *svc.ServiceContext, imagesList []MyType.Image) {
 	}
 }
 
-// imageParentSet 收集所有镜像的父镜像 ID 集合
+// imageParentSet 收集所有镜像的父镜像 ID 集合（带 TTL 缓存）。
 func imageParentSet(ctx *svc.ServiceContext) map[string]bool {
+	imageParentCacheMu.RLock()
+	if imageParentCache != nil && time.Now().Before(imageParentCacheExpires) {
+		cached := imageParentCache
+		imageParentCacheMu.RUnlock()
+		return cached
+	}
+	imageParentCacheMu.RUnlock()
+
+	parents := imageParentScan(ctx)
+
+	imageParentCacheMu.Lock()
+	imageParentCache = parents
+	imageParentCacheExpires = time.Now().Add(imageParentCacheTTL)
+	imageParentCacheMu.Unlock()
+	return parents
+}
+
+// scanImageParentSet 全量扫描镜像并收集父镜像 ID。
+func scanImageParentSet(ctx *svc.ServiceContext) map[string]bool {
 	parents := make(map[string]bool)
 	list, err := ctx.DockerClient.ImageList(context.Background(), image.ListOptions{})
 	if err != nil {
@@ -62,6 +98,15 @@ func imageParentSet(ctx *svc.ServiceContext) map[string]bool {
 		parents[ins.Parent] = true
 	}
 	return parents
+}
+
+// InvalidateImageParentCache 清除父镜像集合缓存。
+// 镜像构建/删除后调用，避免缓存窗口内列表展示过期的依赖状态。
+func InvalidateImageParentCache() {
+	imageParentCacheMu.Lock()
+	imageParentCache = nil
+	imageParentCacheExpires = time.Time{}
+	imageParentCacheMu.Unlock()
 }
 
 func splitImageNameAndTag(imagesList []MyType.Image) []MyType.Image {

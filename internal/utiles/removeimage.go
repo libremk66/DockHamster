@@ -33,6 +33,7 @@ func RemoveImage(ctx *svc.ServiceContext, imageRef string, force bool) error {
 		if _, err := ctx.DockerClient.ImageRemove(context.Background(), inspected.ID, image.RemoveOptions{Force: force}); err != nil {
 			return err
 		}
+		InvalidateImageParentCache()
 		return nil
 	}
 
@@ -48,6 +49,7 @@ func RemoveImage(ctx *svc.ServiceContext, imageRef string, force bool) error {
 	if len(failures) > 0 {
 		return errors.New(strings.Join(failures, "; "))
 	}
+	InvalidateImageParentCache()
 	return nil
 }
 
