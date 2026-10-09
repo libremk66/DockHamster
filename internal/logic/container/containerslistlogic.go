@@ -29,6 +29,7 @@ type Info struct {
 	CreateTime  string             `json:"createTime"`
 	RunningTime string             `json:"runningTime"`
 	HaveUpdate  bool               `json:"haveUpdate"`
+	Uncheckable bool               `json:"uncheckable"`
 	Ports       []string           `json:"ports"`
 	IsSelf      bool               `json:"isSelf"`
 	Compose     utiles.ComposeMeta `json:"compose"`
@@ -86,6 +87,7 @@ func (l *ContainersListLogic) ContainersList() (resp *types.Resp, err error) {
 		containerInfo.CreateTime = t.Format("2006-01-02 15:04:05")
 		containerInfo.RunningTime = v.Status
 		containerInfo.HaveUpdate = v.Update
+		containerInfo.Uncheckable = v.Uncheckable
 		containerInfo.IsSelf = selfupdate.IsSelf(v.ID)
 		containerInfoList = append(containerInfoList, containerInfo)
 	}

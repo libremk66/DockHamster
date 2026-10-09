@@ -27,6 +27,16 @@ func NewUpdateLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateLogi
 
 func (l *UpdateLogic) Update(req *types.ContainerUpdateReq) (resp *types.Resp, err error) {
 	resp = &types.Resp{}
+	// 镜像引用校验：拒绝裸镜像 ID（见 utiles.ValidateUpdateImageRef 注释），
+	// 并顺手规范化（无标签补 :latest）
+	normalized, verr := utiles.ValidateUpdateImageRef(req.ImageNameAndTag)
+	if verr != nil {
+		resp.Code = 400
+		resp.Msg = verr.Error()
+		resp.Data = map[string]interface{}{}
+		return resp, nil
+	}
+	req.ImageNameAndTag = normalized
 	taskID := uuid.New().String()
 	isSelf := selfupdate.IsSelf(req.Id)
 	go func() {

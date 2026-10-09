@@ -21,6 +21,9 @@ import (
 // ImageCheckList 检查更新处理后的镜像列表
 type ImageCheckList struct {
 	NeedUpdate bool
+	// Uncheckable 表示这张镜像**根本无法检测**（无 tag 的悬空镜像、本地构建无远端来源等）——
+	// 与"本次查询失败"（保留旧状态）不同，它会显式清掉"有更新"标记，避免徽标永久卡死。
+	Uncheckable bool
 }
 type ImageUpdateData struct {
 	mu   sync.RWMutex
@@ -41,6 +44,14 @@ func (i *ImageUpdateData) NeedUpdate(imageID string) bool {
 	defer i.mu.RUnlock()
 	v, ok := i.Data[imageID]
 	return ok && v.NeedUpdate
+}
+
+// Uncheckable 并发安全地查询某镜像是否"无法检测"（无 tag / 无远端来源）
+func (i *ImageUpdateData) Uncheckable(imageID string) bool {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	v, ok := i.Data[imageID]
+	return ok && v.Uncheckable
 }
 
 // setAll 并发安全地整体替换数据
@@ -115,11 +126,25 @@ func (i *ImageUpdateData) CheckUpdate(cli DockerInspector, imageList []types.Ima
 	i.setAll(next)
 }
 
-// checkSingleImage 返回 nil 表示本次检查失败（保留旧状态，不作判断）
+// checkSingleImage 返回 nil 表示本次检查**暂时**失败（保留旧状态，不作判断）；
+// 返回 Uncheckable 表示这张镜像根本没法查（显式清掉更新标记）。
 func (i *ImageUpdateData) checkSingleImage(cli DockerInspector, image types.Image) *ImageCheckList {
+	// ① 无有效标签：悬空镜像（tag 被移走了）或本地构建。
+	//    这种镜像没有"名字"可查（此前会拿假标签 "None" 去问 registry，必然失败 →
+	//    又被"保留旧状态"策略兜住 → "有新版"徽标永久卡死，issue #4 的场景）。
+	if len(image.RepoTags) == 0 || image.ImageTag == "" || image.ImageTag == "None" {
+		logx.Infof("镜像无有效标签（悬空/本地构建），标记为无法检测：%s", image.ImageName)
+		return &ImageCheckList{NeedUpdate: false, Uncheckable: true}
+	}
 	remoteDigest, source, err := i.resolveRemoteDigest(cli, image)
 	if err != nil || remoteDigest == "" {
 		logx.Infof("获取远端 digest 失败（%s）: %v", source, err)
+		// ② 区分"暂时失败"与"永久不可查"：仓库不存在/无权限这类错误不会再变好，
+		//    显式标记"无法检测"清掉旧标记；网络抖动等暂态错误仍保留旧状态。
+		if err != nil && isPermanentCheckError(err) {
+			logx.Infof("远端仓库不可达（非暂态），标记为无法检测：%s:%s", image.ImageName, image.ImageTag)
+			return &ImageCheckList{NeedUpdate: false, Uncheckable: true}
+		}
 		return nil
 	}
 	logx.Infof("远端 digest 来源: %s（%s:%s）", source, image.ImageName, image.ImageTag)
@@ -156,6 +181,21 @@ func (i *ImageUpdateData) checkSingleImage(cli DockerInspector, image types.Imag
 		logx.Info(image.ImageName + ":" + image.ImageTag + " not need update")
 	}
 	return &ImageCheckList{NeedUpdate: needUpdate}
+}
+
+// isPermanentCheckError 判断"查不到"是否是永久性的（仓库/标签不存在、无权限），
+// 而不是网络抖动。永久性的不再保留旧状态，避免徽标卡死。
+func isPermanentCheckError(err error) bool {
+	msg := strings.ToLower(err.Error())
+	for _, kw := range []string{
+		"not found", "manifest unknown", "does not exist", "name unknown",
+		"denied", "unauthorized", "invalid reference", "no such",
+	} {
+		if strings.Contains(msg, kw) {
+			return true
+		}
+	}
+	return false
 }
 
 // resolveRemoteDigest 取远端 digest：**优先守护进程通道**，失败回退自建 HTTP（兼容加速站）

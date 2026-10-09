@@ -70,6 +70,9 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 		SnapshotOptions: SnapshotOptionsFromSettings(settings),
 	}
 	pullRef := resolvePullRef(serviceContext, targetImageID, target.Config.Image)
+	if pullRef == "" {
+		return nil, fmt.Errorf("该镜像没有有效标签（本地构建或标签已丢失），无法整组更新")
+	}
 
 	tasks := make([]GroupUpdateTask, 0, len(targets))
 	for _, t := range targets {
