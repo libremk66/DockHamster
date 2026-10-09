@@ -154,10 +154,16 @@ docker compose up -d
 
 ## 七、上游与致谢
 
-DockHamster 的前身是原项目的一个增强分支，现已作为独立项目维护：
+DockHamster 的前身是原项目的一个增强分支，现已作为独立项目维护。
 
-- 上游项目：[onlyLTY/dockerCopilot](https://github.com/onlyLTY/dockerCopilot)（后端）· [dongshull/Docker-Copilot-React](https://github.com/dongshull/Docker-Copilot-React)（前端），**版权归原作者所有**
-- 感谢 [ifsherlock/dockerCopilot](https://github.com/ifsherlock/dockerCopilot)：本项目的**面板自更新（接力容器方案）**、**镜像加速源管理**、**Web 端口直达 / favicon** 等功能参考了该增强分支的设计思路（同为 AGPL-3.0），在此致谢
+### 贡献者
+
+- **[onlyLTY](https://github.com/onlyLTY) · [dongshull](https://github.com/dongshull)** —— 上游原作者（后端 / 前端），本项目的一切基础，**版权归原作者所有**
+- **[ifsherlock](https://github.com/ifsherlock)** —— 设计参考：本项目的**面板自更新（接力容器方案）**、**镜像加速源管理**、**Web 端口直达 / favicon** 的思路来自这个[维护版分支](https://github.com/ifsherlock/dockerCopilot)（同为 AGPL-3.0）
+- **[wthsama](https://github.com/wthsama)** —— 代码贡献：**compose 感知更新与单服务重建**、compose 原文 / 日志接口（[PR #2](https://github.com/libremk66/DockHamster/pull/2)，v1.4.1 合入）
+
+> 还有每一位提交 Issue、给出建议的使用者——本项目的多项修复（如"更新完仍提示有更新"）都由你们的反馈推动。
+
 - 本项目的多项通用修复已向上游提交 PR（[#166](https://github.com/onlyLTY/dockerCopilot/pull/166)），欢迎去官方 issue 下 +1
 - 完整功能与 API 说明见 [FEATURES.md](./FEATURES.md)；上游原始 README 备份见 [README.upstream.md](./README.upstream.md)
 
