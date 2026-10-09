@@ -118,6 +118,13 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 	// 按镜像分组：同一镜像只拉取一次
 	groups := make(map[string][]target)
 	for _, t := range targets {
+		if t.pullRef == "" {
+			// 镜像无标签（悬空/本地构建）：无法确定拉取目标，明确跳过并说明
+			logx.Errorf("自动更新：容器 %s 的镜像无有效标签，跳过", t.name)
+			result.Failed = append(result.Failed, module.AutoRunFailure{Name: t.name, Error: "镜像无有效标签（悬空/本地构建），无法自动更新"})
+			serviceContext.AutoUpdateState.SetContainer(t.name, false, "镜像无有效标签，跳过")
+			continue
+		}
 		groups[t.pullRef] = append(groups[t.pullRef], t)
 	}
 	for pullRef, group := range groups {
@@ -229,15 +236,26 @@ func oneLine(s string) string {
 	return s
 }
 
-// resolvePullRef 优先使用镜像的正式 RepoTag（避免用镜像 ID/摘要作拉取目标）
+// resolvePullRef 取镜像的正式 RepoTag 作为拉取目标。
+// 找不到 tag 时返回空串（**不再回退到镜像 ID/原始引用**）——ID 不是可拉取的名称，
+// 回退只会把"更新/拉取"引向必然失败的路径（issue #4 的教训）；调用方见空串应明确跳过并说明原因。
 func resolvePullRef(serviceContext *svc.ServiceContext, imageID string, fallback string) string {
 	images, err := GetImagesList(serviceContext)
 	if err == nil {
 		for _, img := range images {
-			if img.ID == imageID && len(img.RepoTags) > 0 {
-				return img.RepoTags[0]
+			if img.ID == imageID {
+				if len(img.RepoTags) > 0 {
+					return img.RepoTags[0]
+				}
+				return "" // 无 tag（悬空/本地构建）：不可作为拉取目标
 			}
 		}
 	}
-	return fallback
+	// 列表里找不到该镜像（罕见）：仅当 fallback 是合法的带标签引用时才使用
+	if fallback != "" {
+		if normalized, verr := ValidateUpdateImageRef(fallback); verr == nil {
+			return normalized
+		}
+	}
+	return ""
 }

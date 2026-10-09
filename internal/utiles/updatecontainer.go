@@ -49,6 +49,18 @@ func (o UpdateOptions) resolvePolicy() string {
 // updateContainerCore 更新容器；返回旧镜像处置结果（是否清理 / 快照引用）。
 func updateContainerCore(serviceContext *svc.ServiceContext, id string, name string, imageNameAndTag string, opts UpdateOptions, taskID string) (OldImageOutcome, error) {
 	ctx := context.Background()
+	// 兜底校验：裸镜像 ID 不能作为拉取目标（自动/整组/回滚路径也走这里）
+	if opts.Trigger != "rollback" { // 回滚用的是本地已有镜像的引用，跳过校验
+		if normalized, verr := ValidateUpdateImageRef(imageNameAndTag); verr != nil {
+			serviceContext.UpdateProgress(taskID, svc.TaskProgress{
+				TaskID: taskID, Name: name, Percentage: 0,
+				Message: "镜像名无效", DetailMsg: verr.Error(), IsDone: true, Failed: true,
+			})
+			return OldImageOutcome{}, verr
+		} else {
+			imageNameAndTag = normalized
+		}
+	}
 	// 「任务」页元数据：类型=更新，来源=触发入口（容器页/自动更新/整组/回滚）
 	serviceContext.InitTask(taskID, name, "update", opts.Trigger)
 	serviceContext.UpdateProgress(taskID, svc.TaskProgress{

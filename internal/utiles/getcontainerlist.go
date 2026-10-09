@@ -32,6 +32,9 @@ func CheckImageUpdate(ctx *svc.ServiceContext, containerListData []MyType.Contai
 		if ctx.HubImageInfo.NeedUpdate(v.ImageID) {
 			containerListData[i].Update = true
 		}
+		if ctx.HubImageInfo.Uncheckable(v.ImageID) {
+			containerListData[i].Uncheckable = true
+		}
 	}
 	return containerListData
 }
