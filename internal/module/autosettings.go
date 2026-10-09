@@ -212,6 +212,7 @@ type AutoRunFailure struct {
 }
 
 type AutoUpdateRunResult struct {
+	ID            string           `json:"id"` // 历史删除用；旧记录载入时回填 run-<time>
 	Time          string           `json:"time"`
 	Trigger       string           `json:"trigger"` // auto | manual | group
 	Updated       []string         `json:"updated"`
@@ -310,7 +311,10 @@ type ActiveTask struct {
 	TaskID string `json:"taskID"`
 }
 
-// AutoUpdateState 自动更新运行状态（最近 30 次记录 + 每容器最近状态）。
+// autoUpdateRunCap 运行记录保留条数上限（超出丢弃最旧的）
+const autoUpdateRunCap = 100
+
+// AutoUpdateState 自动更新运行状态（最近 100 次记录 + 每容器最近状态）。
 // 持久化到 /data/config/autoupdate-history.json：面板自更新/版本升级重建容器后记录不丢。
 type AutoUpdateState struct {
 	mu       sync.Mutex
@@ -359,8 +363,19 @@ func (s *AutoUpdateState) load() {
 	defer s.mu.Unlock()
 	if h.Runs != nil {
 		s.runs = h.Runs
-		if len(s.runs) > 30 {
-			s.runs = s.runs[:30]
+		if len(s.runs) > autoUpdateRunCap {
+			s.runs = s.runs[:autoUpdateRunCap]
+		}
+		// 旧记录没有 ID（历史删除功能上线前存的）：按时间回填，保证可被稳定引用
+		backfilled := false
+		for i := range s.runs {
+			if s.runs[i].ID == "" {
+				s.runs[i].ID = "run-" + s.runs[i].Time
+				backfilled = true
+			}
+		}
+		if backfilled {
+			s.persistLocked(true)
 		}
 	}
 	if h.Last != nil {
@@ -434,13 +449,42 @@ func (s *AutoUpdateState) IsRunning() bool {
 }
 
 func (s *AutoUpdateState) AddRun(r AutoUpdateRunResult) {
+	if r.ID == "" {
+		r.ID = NewHistoryID("run")
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.runs = append([]AutoUpdateRunResult{r}, s.runs...)
-	if len(s.runs) > 30 {
-		s.runs = s.runs[:30]
+	if len(s.runs) > autoUpdateRunCap {
+		s.runs = s.runs[:autoUpdateRunCap]
 	}
 	s.persistLocked(true) // 运行记录是关键数据：每次都落盘，不节流
+}
+
+// DeleteRuns 按 ID 删除运行记录，返回实际删除条数
+func (s *AutoUpdateState) DeleteRuns(ids []string) int {
+	if len(ids) == 0 {
+		return 0
+	}
+	want := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		want[id] = true
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	kept := make([]AutoUpdateRunResult, 0, len(s.runs))
+	for _, r := range s.runs {
+		if want[r.ID] {
+			continue
+		}
+		kept = append(kept, r)
+	}
+	n := len(s.runs) - len(kept)
+	if n > 0 {
+		s.runs = kept
+		s.persistLocked(true)
+	}
+	return n
 }
 
 func (s *AutoUpdateState) SetContainer(name string, ok bool, message string) {

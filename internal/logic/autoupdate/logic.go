@@ -3,6 +3,7 @@ package autoupdate
 import (
 	"context"
 	"github.com/libremk66/DockHamster/internal/notify"
+	"sort"
 	"strings"
 	"time"
 
@@ -188,6 +189,80 @@ func (l *AutoUpdateLogic) Tasks() (*types.Resp, error) {
 	resp.Data = map[string]interface{}{
 		"tasks": l.svcCtx.ListTasks(),
 	}
+	return resp, nil
+}
+
+// HistoryEntry 「任务」页历史记录的统一条目（批次运行 + 任务级历史合并后的展示模型）
+type HistoryEntry struct {
+	ID          string                  `json:"id"`
+	Type        string                  `json:"type"` // run（自动/整组批次）| task（单任务）
+	Time        string                  `json:"time"`
+	Trigger     string                  `json:"trigger,omitempty"` // auto|manual|group|container|accelerator|selfupdate|migrate|rollback
+	Kind        string                  `json:"kind,omitempty"`    // update|pull|selfupdate|migrate（task 专属）
+	Name        string                  `json:"name,omitempty"`    // task 专属：容器/对象名
+	Failed      bool                    `json:"failed"`
+	Message     string                  `json:"message,omitempty"`
+	DetailMsg   string                  `json:"detailMsg,omitempty"`
+	DurationSec float64                 `json:"durationSec"`
+	// run 专属字段
+	Updated       []string                `json:"updated,omitempty"`
+	Failures      []module.AutoRunFailure `json:"failures,omitempty"`
+	CleanedImages int                     `json:"cleanedImages,omitempty"`
+	Snapshots     []string                `json:"snapshots,omitempty"`
+	Note          string                  `json:"note,omitempty"`
+}
+
+// TaskHistory 历史记录列表：自动/整组批次运行记录 + 任务级历史，合并按时间倒序
+func (l *AutoUpdateLogic) TaskHistory() (*types.Resp, error) {
+	resp := &types.Resp{Code: 200, Msg: "success"}
+	_, runs, _, _ := l.svcCtx.AutoUpdateState.Snapshot()
+	entries := make([]HistoryEntry, 0, len(runs)+8)
+	for _, r := range runs {
+		entries = append(entries, HistoryEntry{
+			ID: r.ID, Type: "run", Time: r.Time, Trigger: r.Trigger,
+			Failed: len(r.Failed) > 0, DurationSec: r.DurationSec,
+			Updated: r.Updated, Failures: r.Failed, CleanedImages: r.CleanedImages,
+			Snapshots: r.Snapshots, Note: r.Note,
+		})
+	}
+	for _, e := range l.svcCtx.TaskHistory.List() {
+		entries = append(entries, HistoryEntry{
+			ID: e.ID, Type: "task", Time: e.Time, Trigger: e.Source, Kind: e.Kind, Name: e.Name,
+			Failed: e.Failed, Message: e.Message, DetailMsg: e.DetailMsg, DurationSec: e.DurationSec,
+		})
+	}
+	// 时间统一为 "2006-01-02 15:04:05"，字符串比较即时间比较
+	sort.SliceStable(entries, func(i, j int) bool { return entries[i].Time > entries[j].Time })
+	resp.Data = map[string]interface{}{"entries": entries}
+	return resp, nil
+}
+
+// DeleteTaskHistory 按 ID 批量删除历史记录（run- 前缀走运行记录，其余走任务历史）
+func (l *AutoUpdateLogic) DeleteTaskHistory(ids []string) (*types.Resp, error) {
+	resp := &types.Resp{}
+	runIDs := []string{}
+	taskIDs := []string{}
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if strings.HasPrefix(id, "run-") {
+			runIDs = append(runIDs, id)
+		} else {
+			taskIDs = append(taskIDs, id)
+		}
+	}
+	if len(runIDs) == 0 && len(taskIDs) == 0 {
+		resp.Code = 400
+		resp.Msg = "未选择要删除的记录"
+		resp.Data = map[string]interface{}{}
+		return resp, nil
+	}
+	deleted := l.svcCtx.AutoUpdateState.DeleteRuns(runIDs) + l.svcCtx.TaskHistory.Delete(taskIDs)
+	resp.Code = 200
+	resp.Msg = "success"
+	resp.Data = map[string]interface{}{"deleted": deleted}
 	return resp, nil
 }
 

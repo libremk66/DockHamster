@@ -64,6 +64,7 @@ func (l *MigrateLogic) TagImage(req *types.MigrateTagReq) (resp *types.Resp, err
 func (l *MigrateLogic) Export(req *types.MigrateExportReq) (resp *types.Resp, err error) {
 	resp = &types.Resp{}
 	taskID := uuid.New().String()
+	l.svcCtx.InitTask(taskID, "迁移导出", "migrate", "migrate")
 	opts := utiles.ExportOptions{
 		Containers:    req.Containers,
 		IncludeImages: req.IncludeImages,
@@ -83,7 +84,7 @@ func (l *MigrateLogic) Export(req *types.MigrateExportReq) (resp *types.Resp, er
 			l.Errorf("导出失败: %v", eerr)
 			l.svcCtx.UpdateProgress(taskID, svc.TaskProgress{
 				TaskID: taskID, Name: "迁移导出", Percentage: 100,
-				Message: "导出失败", DetailMsg: eerr.Error(), IsDone: true,
+				Message: "导出失败", DetailMsg: eerr.Error(), IsDone: true, Failed: true,
 			})
 			return
 		}
@@ -240,6 +241,7 @@ func (l *MigrateLogic) Apply(req *types.MigrateApplyReq) (resp *types.Resp, err 
 		return resp, nil
 	}
 	taskID := uuid.New().String()
+	l.svcCtx.InitTask(taskID, "迁移导入", "migrate", "migrate")
 	start := req.Start
 	autoDirs := req.AutoCreateDirs
 	items := make([]module.ImportItemOverride, 0, len(req.Items))
@@ -264,7 +266,7 @@ func (l *MigrateLogic) Apply(req *types.MigrateApplyReq) (resp *types.Resp, err 
 			l.Errorf("导入失败: %v", aerr)
 			l.svcCtx.UpdateProgress(taskID, svc.TaskProgress{
 				TaskID: taskID, Name: "迁移导入", Percentage: 100,
-				Message: "导入失败", DetailMsg: aerr.Error(), IsDone: true,
+				Message: "导入失败", DetailMsg: aerr.Error(), IsDone: true, Failed: true,
 			})
 			return
 		}
