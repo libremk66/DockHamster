@@ -2,9 +2,11 @@
 
 <p align="center"><img src="docs/logo.png" width="112" alt="DockHamster"></p>
 
-[![Docker Hub](https://img.shields.io/docker/v/libremk66/dockhamster?label=docker%20hub&logo=docker&logoColor=white)](https://hub.docker.com/r/libremk66/dockhamster)
-[![Docker Pulls](https://img.shields.io/docker/pulls/libremk66/dockhamster)](https://hub.docker.com/r/libremk66/dockhamster)
-[![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+<p align="center">
+  <a href="https://hub.docker.com/r/libremk66/dockhamster"><img src="https://img.shields.io/docker/v/libremk66/dockhamster?label=docker%20hub&logo=docker&logoColor=white" alt="Docker Hub"></a>
+  <a href="https://hub.docker.com/r/libremk66/dockhamster"><img src="https://img.shields.io/docker/pulls/libremk66/dockhamster" alt="Docker Pulls"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License"></a>
+</p>
 
 > **Docker 容器管理面板 · 增强版**
 > 基于 [onlyLTY/dockerCopilot](https://github.com/onlyLTY/dockerCopilot)（AGPL-3.0）二次开发，专注"省心的容器运维"：自动更新、旧镜像清理、整组更新、多渠道通知（飞书/企业微信/QQ 官方应用）、任务中心与历史记录、实时字节级进度、列表化界面、镜像加速源、更新健康校验与自动回滚、面板自更新、容器异常守护、Web 端口直达。
