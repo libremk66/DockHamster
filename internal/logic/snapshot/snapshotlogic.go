@@ -143,7 +143,7 @@ func (l *SnapshotLogic) Rollback(req *types.SnapshotRollbackReq) (resp *types.Re
 			l.Errorf("回滚失败：重新标记 %s 出错: %v", originalRef, terr)
 			l.svcCtx.UpdateProgress(taskID, svc.TaskProgress{
 				TaskID: taskID, Name: req.ContainerName, Percentage: 100,
-				Message: "回滚失败", DetailMsg: "重新标记镜像失败: " + terr.Error(), IsDone: true,
+				Message: "回滚失败", DetailMsg: "重新标记镜像失败: " + terr.Error(), IsDone: true, Failed: true,
 			})
 			return
 		}

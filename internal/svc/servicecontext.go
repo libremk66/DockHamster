@@ -28,6 +28,8 @@ type ServiceContext struct {
 	Watchdog *watchdog.Watchdog
 	// 自动更新（UI 配）
 	AutoUpdate *module.AutoUpdateStore
+	// 任务历史（持久化；「任务」页历史记录标签用）
+	TaskHistory *module.TaskHistoryStore
 	// 镜像加速源（UI 配）
 	Accelerator      *module.AcceleratorStore
 	AutoUpdateState  *module.AutoUpdateState
@@ -68,6 +70,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		ProgressStore:   make(ProgressStoreType),
 		DockerClient:    cli,
 		AutoUpdate:      module.NewAutoUpdateStore(),
+		TaskHistory:     module.NewTaskHistoryStore(),
 		Accelerator:     module.NewAcceleratorStore(),
 		AutoUpdateState: module.NewAutoUpdateState(),
 		AutoUpdateCheck: module.NewCheckState(),
@@ -103,9 +106,10 @@ func (ctx *ServiceContext) InitTask(taskID, name, kind, source string) {
 
 func (ctx *ServiceContext) UpdateProgress(taskID string, progress TaskProgress) {
 	ctx.mu.Lock()
-	defer ctx.mu.Unlock()
 	// 元数据只登记一次：进度更新里缺省的字段从已有记录补齐（调用方常整体覆盖结构体）
-	if old, ok := ctx.ProgressStore[taskID]; ok {
+	old, existed := ctx.ProgressStore[taskID]
+	wasDone := existed && old.IsDone
+	if existed {
 		if progress.Kind == "" {
 			progress.Kind = old.Kind
 		}
@@ -121,6 +125,44 @@ func (ctx *ServiceContext) UpdateProgress(taskID string, progress TaskProgress) 
 	}
 	progress.UpdatedAt = time.Now()
 	ctx.ProgressStore[taskID] = progress
+	ctx.mu.Unlock()
+
+	// 完成跃迁（进行中 → 完成）写一条任务历史；落盘在锁外做，避免拖慢高频进度更新
+	if progress.IsDone && !wasDone {
+		ctx.recordTaskHistory(progress)
+	}
+}
+
+// recordTaskHistory 任务完成时写入持久化历史（「任务」页历史记录）。
+// 自动更新 / 整组更新是批次语义、由 AutoUpdateState 的运行记录覆盖，这里跳过避免重复。
+func (ctx *ServiceContext) recordTaskHistory(p TaskProgress) {
+	if ctx.TaskHistory == nil {
+		return
+	}
+	if p.Source == "autoupdate" || p.Source == "group" {
+		return
+	}
+	if p.Kind == "" && p.Source == "" && p.Name == "" {
+		return // 无任何元数据的进度记录，无回看价值
+	}
+	now := time.Now()
+	e := module.TaskHistoryEntry{
+		Time:      now.Format("2006-01-02 15:04:05"),
+		Name:      p.Name,
+		Kind:      p.Kind,
+		Source:    p.Source,
+		Failed:    p.Failed,
+		Message:   p.Message,
+		DetailMsg: p.DetailMsg,
+	}
+	if !p.StartedAt.IsZero() {
+		e.StartedAt = p.StartedAt.Format("2006-01-02 15:04:05")
+		e.DurationSec = now.Sub(p.StartedAt).Seconds()
+		if e.DurationSec < 0 {
+			e.DurationSec = 0
+		}
+	}
+	ctx.TaskHistory.Add(e)
 }
 
 // TaskView 任务列表项（「任务」页用）

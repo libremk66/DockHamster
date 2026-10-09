@@ -80,6 +80,29 @@ func TasksHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	}
 }
 
+func TaskHistoryHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := autoupdate.NewAutoUpdateLogic(r.Context(), svcCtx)
+		resp, err := l.TaskHistory()
+		write(w, r, resp, err)
+	}
+}
+
+func DeleteTaskHistoryHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			IDs []string `json:"ids"`
+		}
+		if err := httpx.Parse(r, &req); err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+		l := autoupdate.NewAutoUpdateLogic(r.Context(), svcCtx)
+		resp, err := l.DeleteTaskHistory(req.IDs)
+		write(w, r, resp, err)
+	}
+}
+
 func TestNotifyHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {

@@ -161,6 +161,7 @@ func (l *AcceleratorLogic) Pull(source, imageRef string) (*types.Resp, error) {
 			p.Message = "加速拉取失败"
 			p.DetailMsg = err.Error()
 			p.IsDone = true
+			p.Failed = true
 			l.svcCtx.UpdateProgress(taskID, p)
 			return
 		}
