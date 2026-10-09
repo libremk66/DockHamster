@@ -30,3 +30,5 @@ __pycache__/
 /db.sqlite3
 /front/
 /logs/
+# 本地私有笔记（不进公开仓库）
+docs/local/
