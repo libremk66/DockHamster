@@ -156,8 +156,8 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 			logx.Errorf("自动更新：拉取 %s 失败，跳过本组：%v", pullRef, err)
 			// 失败进度已由拉取流程写进各 taskID（含 Failed 标记，UI 显示红色）
 			for _, t := range group {
-				result.Failed = append(result.Failed, module.AutoRunFailure{Name: t.Name, Error: "拉取失败: " + oneLine(err.Error())})
-				serviceContext.AutoUpdateState.SetContainer(t.Name, false, "拉取失败: "+oneLine(err.Error()))
+				result.Failed = append(result.Failed, module.AutoRunFailure{Name: t.Name, Error: "拉取失败: " + oneLine(FriendlyDaemonError(err).Error())})
+				serviceContext.AutoUpdateState.SetContainer(t.Name, false, "拉取失败: "+oneLine(FriendlyDaemonError(err).Error()))
 			}
 			continue
 		}
@@ -335,8 +335,8 @@ func composeAutoUpdateMessage(r module.AutoUpdateRunResult) (title, text string)
 // oneLine 压成单行并截断（用于失败原因/通知文本）
 func oneLine(s string) string {
 	s = strings.Join(strings.Fields(s), " ")
-	if len(s) > 120 {
-		return s[:120] + "…"
+	if len(s) > 200 {
+		return s[:200] + "…"
 	}
 	return s
 }

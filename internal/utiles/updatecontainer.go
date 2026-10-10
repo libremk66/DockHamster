@@ -121,12 +121,12 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 		// 配置了默认加速源时走加速源拉取（失败自动回退直连）
 		if err := PullImageForUpdate(serviceContext, taskID, imageNameAndTag); err != nil {
 			oldTaskProgress.Message = "拉取镜像失败"
-			oldTaskProgress.DetailMsg = err.Error()
+			oldTaskProgress.DetailMsg = FriendlyDaemonError(err).Error()
 			oldTaskProgress.IsDone = true
 			oldTaskProgress.Failed = true
 			serviceContext.UpdateProgress(taskID, oldTaskProgress)
 			logx.Errorf("Failed to pull image: %s", err)
-			return OldImageOutcome{}, err
+			return OldImageOutcome{}, FriendlyDaemonError(err)
 		}
 	}
 	oldTaskProgress, result = serviceContext.GetProgress(taskID)
@@ -153,12 +153,12 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	inspectedContainer, err := serviceContext.DockerClient.ContainerInspect(ctx, id)
 	if err != nil {
 		oldTaskProgress.Message = "获取容器信息失败"
-		oldTaskProgress.DetailMsg = err.Error()
+		oldTaskProgress.DetailMsg = FriendlyDaemonError(err).Error()
 		oldTaskProgress.IsDone = true
 		oldTaskProgress.Failed = true
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
 		logx.Error("获取容器信息失败" + err.Error())
-		return OldImageOutcome{}, err
+		return OldImageOutcome{}, FriendlyDaemonError(err)
 	}
 	oldImageID := inspectedContainer.Image
 	wasRunning := inspectedContainer.State != nil && inspectedContainer.State.Running
@@ -174,11 +174,11 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	err = serviceContext.DockerClient.ContainerStop(context.Background(), id, stopOptions)
 	if err != nil {
 		oldTaskProgress.Message = "停止容器失败"
-		oldTaskProgress.DetailMsg = err.Error()
+		oldTaskProgress.DetailMsg = FriendlyDaemonError(err).Error()
 		oldTaskProgress.IsDone = true
 		oldTaskProgress.Failed = true
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
-		return OldImageOutcome{}, err
+		return OldImageOutcome{}, FriendlyDaemonError(err)
 	}
 	oldTaskProgress.Message = "容器停止成功"
 	oldTaskProgress.DetailMsg = "容器停止成功"
@@ -193,11 +193,11 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	err = serviceContext.DockerClient.ContainerRename(context.Background(), id, backupName)
 	if err != nil {
 		oldTaskProgress.Message = "重命名旧容器失败"
-		oldTaskProgress.DetailMsg = err.Error()
+		oldTaskProgress.DetailMsg = FriendlyDaemonError(err).Error()
 		oldTaskProgress.IsDone = true
 		oldTaskProgress.Failed = true
 		serviceContext.UpdateProgress(taskID, oldTaskProgress)
-		return OldImageOutcome{}, err
+		return OldImageOutcome{}, FriendlyDaemonError(err)
 	}
 	oldTaskProgress.Message = "重命名旧容器成功"
 	oldTaskProgress.DetailMsg = "重命名旧容器成功"
@@ -232,7 +232,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	containerName := name
 	_, err = serviceContext.DockerClient.ContainerCreate(ctx, config, hostConfig, networkingConfig, nil, containerName)
 	if err != nil {
-		return OldImageOutcome{}, rollback("创建新容器失败: " + err.Error())
+		return OldImageOutcome{}, rollback("创建新容器失败: " + FriendlyDaemonError(err).Error())
 	}
 	oldTaskProgress.Message = "创建新容器成功"
 	oldTaskProgress.DetailMsg = "创建新容器成功"
@@ -249,7 +249,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 			CheckpointDir: "",
 		})
 		if err != nil {
-			return OldImageOutcome{}, rollback("启动新容器失败: " + err.Error())
+			return OldImageOutcome{}, rollback("启动新容器失败: " + FriendlyDaemonError(err).Error())
 		}
 	} else {
 		oldTaskProgress.Message = "容器原为停止状态，保持停止"
@@ -275,11 +275,11 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 		err = serviceContext.DockerClient.ContainerRemove(context.Background(), id, container.RemoveOptions{})
 		if err != nil {
 			oldTaskProgress.Message = "删除旧容器失败"
-			oldTaskProgress.DetailMsg = err.Error()
+			oldTaskProgress.DetailMsg = FriendlyDaemonError(err).Error()
 			oldTaskProgress.IsDone = true
 			oldTaskProgress.Failed = true
 			serviceContext.UpdateProgress(taskID, oldTaskProgress)
-			return OldImageOutcome{}, err
+			return OldImageOutcome{}, FriendlyDaemonError(err)
 		}
 	}
 	// 旧镜像处置：按策略（清理 / 打快照 / 不处理）；失败不影响更新结果

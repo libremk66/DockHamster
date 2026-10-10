@@ -298,7 +298,7 @@ func (l *AutoUpdateLogic) UpdateGroup(req *types.GroupUpdateReq) (*types.Resp, e
 	tasks, err := utiles.RunGroupUpdate(l.svcCtx, req.Id)
 	if err != nil {
 		resp.Code = 500
-		resp.Msg = err.Error()
+		resp.Msg = utiles.FriendlyDaemonError(err).Error()
 		resp.Data = map[string]interface{}{}
 		return resp, nil
 	}

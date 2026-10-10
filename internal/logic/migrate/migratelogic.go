@@ -84,7 +84,7 @@ func (l *MigrateLogic) Export(req *types.MigrateExportReq) (resp *types.Resp, er
 			l.Errorf("导出失败: %v", eerr)
 			l.svcCtx.UpdateProgress(taskID, svc.TaskProgress{
 				TaskID: taskID, Name: "迁移导出", Percentage: 100,
-				Message: "导出失败", DetailMsg: eerr.Error(), IsDone: true, Failed: true,
+				Message: "导出失败", DetailMsg: utiles.FriendlyDaemonError(eerr).Error(), IsDone: true, Failed: true,
 			})
 			return
 		}
@@ -266,7 +266,7 @@ func (l *MigrateLogic) Apply(req *types.MigrateApplyReq) (resp *types.Resp, err 
 			l.Errorf("导入失败: %v", aerr)
 			l.svcCtx.UpdateProgress(taskID, svc.TaskProgress{
 				TaskID: taskID, Name: "迁移导入", Percentage: 100,
-				Message: "导入失败", DetailMsg: aerr.Error(), IsDone: true, Failed: true,
+				Message: "导入失败", DetailMsg: utiles.FriendlyDaemonError(aerr).Error(), IsDone: true, Failed: true,
 			})
 			return
 		}
