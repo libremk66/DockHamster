@@ -84,3 +84,23 @@ func TestAutoUpdateRunIDAndDelete(t *testing.T) {
 		t.Fatalf("按回填 ID 删除失败: %d", n)
 	}
 }
+
+// 提前量归一化：未设置/非法 → 默认 10；上限 120
+func TestNotifyBeforeUpdateLeadNormalize(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "c.json")
+	t.Setenv("AutoUpdateConfigFile", path)
+	// 未设置
+	s := NewAutoUpdateStore()
+	if got := s.Get().NotifyBeforeUpdateLeadMin; got != 10 {
+		t.Fatalf("未设置时应默认 10，实际 %d", got)
+	}
+	// 超上限
+	st := s.Get()
+	st.NotifyBeforeUpdateLeadMin = 999
+	if err := s.Save(st); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Get().NotifyBeforeUpdateLeadMin; got != 120 {
+		t.Fatalf("超上限应夹到 120，实际 %d", got)
+	}
+}

@@ -194,16 +194,16 @@ func (l *AutoUpdateLogic) Tasks() (*types.Resp, error) {
 
 // HistoryEntry 「任务」页历史记录的统一条目（批次运行 + 任务级历史合并后的展示模型）
 type HistoryEntry struct {
-	ID          string                  `json:"id"`
-	Type        string                  `json:"type"` // run（自动/整组批次）| task（单任务）
-	Time        string                  `json:"time"`
-	Trigger     string                  `json:"trigger,omitempty"` // auto|manual|group|container|accelerator|selfupdate|migrate|rollback
-	Kind        string                  `json:"kind,omitempty"`    // update|pull|selfupdate|migrate（task 专属）
-	Name        string                  `json:"name,omitempty"`    // task 专属：容器/对象名
-	Failed      bool                    `json:"failed"`
-	Message     string                  `json:"message,omitempty"`
-	DetailMsg   string                  `json:"detailMsg,omitempty"`
-	DurationSec float64                 `json:"durationSec"`
+	ID          string  `json:"id"`
+	Type        string  `json:"type"` // run（自动/整组批次）| task（单任务）
+	Time        string  `json:"time"`
+	Trigger     string  `json:"trigger,omitempty"` // auto|manual|group|container|accelerator|selfupdate|migrate|rollback
+	Kind        string  `json:"kind,omitempty"`    // update|pull|selfupdate|migrate（task 专属）
+	Name        string  `json:"name,omitempty"`    // task 专属：容器/对象名
+	Failed      bool    `json:"failed"`
+	Message     string  `json:"message,omitempty"`
+	DetailMsg   string  `json:"detailMsg,omitempty"`
+	DurationSec float64 `json:"durationSec"`
 	// run 专属字段
 	Updated       []string                `json:"updated,omitempty"`
 	Failures      []module.AutoRunFailure `json:"failures,omitempty"`

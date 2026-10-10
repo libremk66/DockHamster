@@ -40,6 +40,11 @@ type AutoUpdateSettings struct {
 	// NotifyBeforeUpdate 定时更新开始前发送提醒（列出即将更新的容器，提醒保存工作）；默认关闭
 	// （定时任务常在半夜，默认开会给所有人多一条夜间消息，需要的人自己开）
 	NotifyBeforeUpdate bool `json:"notifyBeforeUpdate,optional"`
+	// NotifyBeforeUpdateLeadMin 提前多少分钟发提醒（1..120，默认 10）。
+	// 预告与更新解耦：更新仍由原 cron 驱动，这里只决定提前量，让用户来得及保存工作。
+	NotifyBeforeUpdateLeadMin int `json:"notifyBeforeUpdateLeadMin,optional"`
+	// NotifyOnManualUpdate 容器页手动更新完成后也发结果简报（默认关闭；批次运行由运行简报覆盖，不重复发）
+	NotifyOnManualUpdate bool `json:"notifyOnManualUpdate,optional"`
 }
 
 type AutoUpdateStore struct {
@@ -141,6 +146,12 @@ func (s *AutoUpdateSettings) normalizePolicies() {
 	if strings.TrimSpace(s.CheckCron) == "" {
 		s.CheckCron = "30 * * * *"
 	}
+	if s.NotifyBeforeUpdateLeadMin <= 0 {
+		s.NotifyBeforeUpdateLeadMin = 10
+	}
+	if s.NotifyBeforeUpdateLeadMin > 120 {
+		s.NotifyBeforeUpdateLeadMin = 120
+	}
 	if s.ContainerPolicy == nil {
 		s.ContainerPolicy = map[string]string{}
 	}
@@ -173,6 +184,8 @@ func defaultAutoSettings() AutoUpdateSettings {
 		DeleteOldImage:  true,
 		NotifyOnSuccess: true,
 		NotifyOnFailure: true,
+		// 提前量默认 10 分钟（开关默认关，打开即生效；normalizePolicies 对旧配置也有兜底）
+		NotifyBeforeUpdateLeadMin: 10,
 	}
 	if v := strings.TrimSpace(os.Getenv("AutoUpdateContainers")); v != "" {
 		se.Containers = SplitNameList(v)

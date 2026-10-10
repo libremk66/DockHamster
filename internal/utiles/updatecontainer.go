@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	dockerMsgType "github.com/docker/docker/pkg/jsonmessage"
+	"github.com/libremk66/DockHamster/internal/notify"
 	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/zeromicro/go-zero/core/logx"
 	"io"
@@ -48,6 +49,8 @@ func (o UpdateOptions) resolvePolicy() string {
 // updateContainerCore 更新容器；返回旧镜像处置结果（是否清理 / 快照引用）。
 func updateContainerCore(serviceContext *svc.ServiceContext, id string, name string, imageNameAndTag string, opts UpdateOptions, taskID string) (OldImageOutcome, error) {
 	ctx := context.Background()
+	// 手动（容器页）更新的结果通知：开关默认关；批次触发（自动/整组）由运行简报统一覆盖，这里不发
+	defer notifyManualUpdateResult(serviceContext, taskID, name, opts.Trigger)
 	// 兜底校验：裸镜像 ID 不能作为拉取目标（自动/整组/回滚路径也走这里）
 	if opts.Trigger != "rollback" { // 回滚用的是本地已有镜像的引用，跳过校验
 		if normalized, verr := ValidateUpdateImageRef(imageNameAndTag); verr != nil {
@@ -503,4 +506,42 @@ func humanBytes(n int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f%sB", float64(n)/float64(div), "KMGT"[exp:exp+1])
+}
+
+// notifyManualUpdateResult 容器页手动更新（trigger=container）完成后的结果简报。
+// 开关：设置里的 NotifyOnManualUpdate（默认关闭）。结果取自任务进度记录，成功/失败文案与面板一致。
+func notifyManualUpdateResult(serviceContext *svc.ServiceContext, taskID, name, trigger string) {
+	if trigger != "container" { // 只覆盖容器页单点更新；自动/整组走运行简报
+		return
+	}
+	settings := serviceContext.AutoUpdate.Get()
+	if !settings.NotifyOnManualUpdate {
+		return
+	}
+	p, ok := serviceContext.GetProgress(taskID)
+	if !ok {
+		return
+	}
+	failed := p.Failed || strings.Contains(p.Message, "失败")
+	title := "🔄 DockHamster 容器更新 · " + time.Now().Format("2006-01-02 15:04")
+	var b strings.Builder
+	if failed {
+		reason := p.DetailMsg
+		if reason == "" {
+			reason = p.Message
+		}
+		fmt.Fprintf(&b, "⚠️ %s 更新失败\n%s\n", name, oneLine(reason))
+	} else {
+		fmt.Fprintf(&b, "✅ %s 更新成功\n", name)
+	}
+	if d := p.UpdatedAt.Sub(p.StartedAt).Seconds(); d > 0 {
+		fmt.Fprintf(&b, "⏱️ 耗时 %.1fs", d)
+	}
+	for _, res := range notify.Send(settings.Notify, title, b.String()) {
+		if res.OK {
+			logx.Infof("手动更新结果已发送: %s", res.Channel)
+		} else {
+			logx.Errorf("手动更新结果发送失败 %s: %s", res.Channel, res.Error)
+		}
+	}
 }
