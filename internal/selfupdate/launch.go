@@ -144,10 +144,10 @@ func ReportResultOnBoot(svcCtx *svc.ServiceContext) {
 	if !ok {
 		return
 	}
-	title := "🔄 面板自更新成功"
+	title := "🔄 " + utiles.HostTag(svcCtx) + "面板自更新成功"
 	text := fmt.Sprintf("已完成自更新\n镜像：%s\n时间：%s", res.Image, res.At)
 	if res.Status != "success" {
-		title = "⚠️ 面板自更新失败（已回滚）"
+		title = "⚠️ " + utiles.HostTag(svcCtx) + "面板自更新失败（已回滚）"
 		text = fmt.Sprintf("更新到 %s 失败：%s\n已自动回滚旧版本\n时间：%s", res.Image, res.Error, res.At)
 	}
 	logx.Info(title + " | " + strings.ReplaceAll(text, "\n", " "))

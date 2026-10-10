@@ -82,6 +82,7 @@ func main() {
 		Notify: func(title, text string) {
 			notify.Send(ctx.AutoUpdate.Get().Notify, title, text)
 		},
+		HostTag: func() string { return utiles.HostTag(ctx) },
 	})
 	ctx.Watchdog.Start()
 

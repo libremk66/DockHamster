@@ -204,7 +204,7 @@ func notifyAutoUpdate(serviceContext *svc.ServiceContext, r module.AutoUpdateRun
 	if len(r.Failed) == 0 && !settings.NotifyOnSuccess {
 		return
 	}
-	title, text := composeAutoUpdateMessage(r)
+	title, text := composeAutoUpdateMessage(HostTag(serviceContext), r)
 	results := notify.Send(settings.Notify, title, text)
 	for _, res := range results {
 		if res.OK {
@@ -282,7 +282,7 @@ func sendBeforeUpdateNotice(serviceContext *svc.ServiceContext, planAt time.Time
 	for _, t := range targets {
 		names = append(names, t.Name)
 	}
-	title, text := composeBeforeUpdateMessage(names, planAt.Format("2006-01-02 15:04"))
+	title, text := composeBeforeUpdateMessage(HostTag(serviceContext), names, planAt.Format("2006-01-02 15:04"))
 	for _, res := range notify.Send(settings.Notify, title, text) {
 		if res.OK {
 			logx.Infof("更新前提醒已发送: %s", res.Channel)
@@ -293,8 +293,8 @@ func sendBeforeUpdateNotice(serviceContext *svc.ServiceContext, planAt time.Time
 }
 
 // composeBeforeUpdateMessage 更新前提醒的文案（渠道通用；飞书应用模式会渲染成卡片）
-func composeBeforeUpdateMessage(names []string, ts string) (title, text string) {
-	title = "⏳ DockHamster 更新即将开始 · " + ts
+func composeBeforeUpdateMessage(hostTag string, names []string, ts string) (title, text string) {
+	title = "⏳ " + hostTag + "DockHamster 更新即将开始 · " + ts
 	var b strings.Builder
 	fmt.Fprintf(&b, "将更新 %d 个容器（会短暂重启）：\n", len(names))
 	for _, n := range names {
@@ -304,10 +304,10 @@ func composeBeforeUpdateMessage(names []string, ts string) (title, text string) 
 	return title, b.String()
 }
 
-func composeAutoUpdateMessage(r module.AutoUpdateRunResult) (title, text string) {
-	title = "🔄 DockHamster 自动更新 " + r.Time
+func composeAutoUpdateMessage(hostTag string, r module.AutoUpdateRunResult) (title, text string) {
+	title = "🔄 " + hostTag + "DockHamster 自动更新 · " + r.Time
 	if r.Trigger == "group" {
-		title = "🔄 DockHamster 整组更新 " + r.Time
+		title = "🔄 " + hostTag + "DockHamster 整组更新 · " + r.Time
 	}
 	var b strings.Builder
 	if len(r.Updated) > 0 {

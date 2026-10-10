@@ -179,6 +179,8 @@ func (l *AutoUpdateLogic) Status() (*types.Resp, error) {
 		"activeTasks": activeTasks,
 		"nextAutoAt":  nextAuto,
 		"nextCheckAt": nextCheck,
+		// 通知标题里实际生效的主机标识（供 UI 提示"留空=自动"时展示）
+		"hostLabel": utiles.ResolvedHostLabel(l.svcCtx),
 	}
 	return resp, nil
 }

@@ -45,6 +45,9 @@ type AutoUpdateSettings struct {
 	NotifyBeforeUpdateLeadMin int `json:"notifyBeforeUpdateLeadMin,optional"`
 	// NotifyOnManualUpdate 容器页手动更新完成后也发结果简报（默认关闭；批次运行由运行简报覆盖，不重复发）
 	NotifyOnManualUpdate bool `json:"notifyOnManualUpdate,optional"`
+	// HostLabel 通知标题里的主机标识（如 jknas / 客厅 NAS）；留空 = 自动用 daemon 主机名。
+	// 同一台机器跑多个面板时建议自定义（否则标题区分不开）
+	HostLabel string `json:"hostLabel,optional"`
 }
 
 type AutoUpdateStore struct {

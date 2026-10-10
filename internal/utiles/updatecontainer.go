@@ -523,7 +523,7 @@ func notifyManualUpdateResult(serviceContext *svc.ServiceContext, taskID, name, 
 		return
 	}
 	failed := p.Failed || strings.Contains(p.Message, "失败")
-	title := "🔄 DockHamster 容器更新 · " + time.Now().Format("2006-01-02 15:04")
+	title := "🔄 " + HostTag(serviceContext) + "DockHamster 容器更新 · " + time.Now().Format("2006-01-02 15:04")
 	var b strings.Builder
 	if failed {
 		reason := p.DetailMsg

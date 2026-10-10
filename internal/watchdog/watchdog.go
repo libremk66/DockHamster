@@ -32,6 +32,7 @@ const (
 type Config struct {
 	Disabled func() bool              // 是否停用守护
 	Notify   func(title, text string) // 发通知（走已配置的通知渠道）
+	HostTag  func() string            // 通知标题里的主机标记（如 "[jknas] "），可空
 }
 
 type containerState struct {
@@ -57,6 +58,14 @@ func New(cli *client.Client, cfg Config) *Watchdog {
 		states:  map[string]*containerState{},
 		silence: map[string]time.Time{},
 	}
+}
+
+// hostTag 取通知标题的主机标记；未注入时返回空串
+func (w *Watchdog) hostTag() string {
+	if w == nil || w.cfg.HostTag == nil {
+		return ""
+	}
+	return w.cfg.HostTag()
 }
 
 // Start 启动后台巡检
@@ -130,7 +139,7 @@ func (w *Watchdog) Tick() {
 							cause = fmt.Sprintf("被 OOM 杀掉（内存不足，退出码 %d）", st.ExitCode)
 						}
 						w.notify(
-							"🔴 容器异常退出："+name,
+							"🔴 "+w.hostTag()+"容器异常退出："+name,
 							fmt.Sprintf("容器 %s %s\n时间：%s\n可在 DockHamster 容器页查看并重启", name, cause, fin.Local().Format("2006-01-02 15:04:05")),
 						)
 						cur.notifiedDown = true
@@ -153,7 +162,7 @@ func (w *Watchdog) Tick() {
 					cause = fmt.Sprintf("被 OOM 杀掉（内存不足，退出码 %d）", st.ExitCode)
 				}
 				w.notify(
-					"🔴 容器异常退出："+name,
+					"🔴 "+w.hostTag()+"容器异常退出："+name,
 					fmt.Sprintf("容器 %s %s\n时间：%s\n可在 DockHamster 容器页查看并重启", name, cause, now.Format("2006-01-02 15:04:05")),
 				)
 				prev.notifiedDown = true
@@ -164,7 +173,7 @@ func (w *Watchdog) Tick() {
 		if !prev.running && st.Running && prev.notifiedDown {
 			if w.allowNotify(prev, "up", now) {
 				w.notify(
-					"🟢 容器已恢复运行："+name,
+					"🟢 "+w.hostTag()+"容器已恢复运行："+name,
 					fmt.Sprintf("容器 %s 已重新运行\n时间：%s", name, now.Format("2006-01-02 15:04:05")),
 				)
 			}
@@ -187,7 +196,7 @@ func (w *Watchdog) Tick() {
 		prev.restartTimes = kept
 		if len(prev.restartTimes) >= restartTrigger && !silent && w.allowNotify(prev, "restart", now) {
 			w.notify(
-				"♻️ 容器反复重启："+name,
+				"♻️ "+w.hostTag()+"容器反复重启："+name,
 				fmt.Sprintf("容器 %s 最近 %d 分钟内重启 %d 次，可能存在配置错误或依赖异常\n建议到面板查看容器日志/状态",
 					name, int(restartWindow.Minutes()), len(prev.restartTimes)),
 			)
