@@ -17,7 +17,6 @@ import (
 
 	dockerBackend "github.com/docker/docker/api/types/backend"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
 	"github.com/libremk66/DockHamster/internal/config"
 	"github.com/libremk66/DockHamster/internal/module"
 	"github.com/libremk66/DockHamster/internal/svc"
@@ -170,7 +169,8 @@ func ExportPackage(svcCtx *svc.ServiceContext, opts ExportOptions, taskID string
 		if hcfg == nil {
 			hcfg = &container.HostConfig{}
 		}
-		nc := &network.NetworkingConfig{EndpointsConfig: inspected.NetworkSettings.Networks}
+		// 同上：迁移包里的网络配置也只带用户设置过的字段（否则导入端重建时同样会被老 daemon 拒）
+		nc := NetworkingConfigForRecreate(svcCtx.DockerClient, inspected)
 		createCfg := dockerBackend.ContainerCreateConfig{Config: &exportCfg, HostConfig: hcfg, NetworkingConfig: nc, Name: t.name}
 		raw, merr := json.Marshal(createCfg)
 		if merr != nil {

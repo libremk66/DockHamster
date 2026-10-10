@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	"github.com/libremk66/DockHamster/internal/utiles"
 )
 
 // RunRelay 在接力容器内执行完整的自更新流程，返回进程退出码
@@ -81,7 +81,8 @@ func RunRelay() int {
 	cfg := ins.Config
 	cfg.Image = image
 	hostCfg := ins.HostConfig
-	netCfg := &network.NetworkingConfig{EndpointsConfig: ins.NetworkSettings.Networks}
+	// 同上：只带用户设置过的网络字段（老 daemon 不认识每网络 MacAddress）
+	netCfg := utiles.NetworkingConfigForRecreate(cli, ins)
 
 	relayLog("使用新镜像创建容器 %s", name)
 	if _, err := cli.ContainerCreate(ctx, cfg, hostCfg, netCfg, nil, name); err != nil {

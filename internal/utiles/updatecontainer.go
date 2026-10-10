@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
 	dockerMsgType "github.com/docker/docker/pkg/jsonmessage"
 	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -224,9 +223,9 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	inspectedContainer.Image = imageNameAndTag
 	config := inspectedContainer.Config
 	hostConfig := inspectedContainer.HostConfig
-	networkingConfig := &network.NetworkingConfig{
-		EndpointsConfig: inspectedContainer.NetworkSettings.Networks,
-	}
+	// 网络配置只带"用户设置过的部分"：整块照抄会把运行时回填的每网络 MacAddress 也带上，
+	// 老 daemon（如群晖 Docker 24.0.x / API 1.43）会直接拒绝创建（见 networking.go）
+	networkingConfig := NetworkingConfigForRecreate(serviceContext.DockerClient, inspectedContainer)
 	containerName := name
 	_, err = serviceContext.DockerClient.ContainerCreate(ctx, config, hostConfig, networkingConfig, nil, containerName)
 	if err != nil {
