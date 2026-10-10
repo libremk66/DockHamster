@@ -29,7 +29,7 @@ func (l *RenameLogic) Rename(req *types.ContainerRenameReq) (resp *types.Resp, e
 	err = utiles.RenameContainer(l.svcCtx, req.Id, req.NewName)
 	if err != nil {
 		resp.Code = 400
-		resp.Msg = err.Error()
+		resp.Msg = utiles.FriendlyDaemonError(err).Error()
 		resp.Data = map[string]interface{}{}
 		return resp, err
 	}

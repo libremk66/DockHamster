@@ -136,7 +136,7 @@ func (l *AcceleratorLogic) Pull(source, imageRef string) (*types.Resp, error) {
 		return &types.Resp{Code: 400, Msg: "镜像为空", Data: map[string]interface{}{}}, nil
 	}
 	if _, err := utiles.MirrorRefFor(source, imageRef); err != nil {
-		return &types.Resp{Code: 400, Msg: err.Error(), Data: map[string]interface{}{}}, nil
+		return &types.Resp{Code: 400, Msg: utiles.FriendlyDaemonError(err).Error(), Data: map[string]interface{}{}}, nil
 	}
 	taskID := uuid.New().String()
 	l.svcCtx.UpdateProgress(taskID, svc.TaskProgress{
@@ -155,7 +155,7 @@ func (l *AcceleratorLogic) Pull(source, imageRef string) (*types.Resp, error) {
 		}()
 		l.svcCtx.InitTask(taskID, imageRef, "pull", "accelerator")
 		if err := utiles.PullImageViaMirror(l.svcCtx, taskID, source, imageRef); err != nil {
-			err = utiles.FriendlyPullError(imageRef, err)
+			err = utiles.FriendlyDaemonError(utiles.FriendlyPullError(imageRef, err))
 			p, _ := l.svcCtx.GetProgress(taskID)
 			p.TaskID = taskID
 			p.Message = "加速拉取失败"

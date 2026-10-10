@@ -49,7 +49,7 @@ func (l *ContainersListLogic) ContainersList() (resp *types.Resp, err error) {
 	list, err := utiles.GetContainerList(l.svcCtx)
 	if err != nil {
 		resp.Code = 500
-		resp.Msg = err.Error()
+		resp.Msg = utiles.FriendlyDaemonError(err).Error()
 		resp.Data = map[string]interface{}{}
 		return resp, err
 	}

@@ -29,7 +29,7 @@ func (l *RestartLogic) Restart(req *types.IdReq) (resp *types.Resp, err error) {
 	err = utiles.RestartContainer(l.svcCtx, req.Id)
 	if err != nil {
 		resp.Code = 400
-		resp.Msg = err.Error()
+		resp.Msg = utiles.FriendlyDaemonError(err).Error()
 		resp.Data = map[string]interface{}{}
 		return resp, err
 	}

@@ -104,7 +104,7 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 		}
 		if err := PullImageByRefForTasks(serviceContext, pullRef, groupTaskIDs); err != nil {
 			logx.Errorf("整组更新：拉取 %s 失败：%v", pullRef, err)
-			result.Failed = append(result.Failed, module.AutoRunFailure{Name: pullRef, Error: "拉取失败: " + oneLine(err.Error())})
+			result.Failed = append(result.Failed, module.AutoRunFailure{Name: pullRef, Error: "拉取失败: " + oneLine(FriendlyDaemonError(err).Error())})
 			result.DurationSec = time.Since(start).Seconds()
 			serviceContext.AutoUpdateState.AddRun(result)
 			notifyAutoUpdate(serviceContext, result)
@@ -114,8 +114,8 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 			outcome, err := updateContainerCore(serviceContext, t.ID, t.Name, pullRef, opts, t.TaskID)
 			if err != nil {
 				logx.Errorf("整组更新：容器 %s 更新失败：%v", t.Name, err)
-				result.Failed = append(result.Failed, module.AutoRunFailure{Name: t.Name, Error: oneLine(err.Error())})
-				serviceContext.AutoUpdateState.SetContainer(t.Name, false, oneLine(err.Error()))
+				result.Failed = append(result.Failed, module.AutoRunFailure{Name: t.Name, Error: oneLine(FriendlyDaemonError(err).Error())})
+				serviceContext.AutoUpdateState.SetContainer(t.Name, false, oneLine(FriendlyDaemonError(err).Error()))
 			} else {
 				logx.Infof("整组更新：容器 %s 更新完成", t.Name)
 				result.Updated = append(result.Updated, t.Name)

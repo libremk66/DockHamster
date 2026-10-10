@@ -30,7 +30,7 @@ func (l *RemoveLogic) Remove(req *types.RemoveImageReq) (resp *types.Resp, err e
 	err = utiles.RemoveImage(l.svcCtx, req.Id, req.Force)
 	if err != nil {
 		resp.Code = 409
-		resp.Msg = err.Error()
+		resp.Msg = utiles.FriendlyDaemonError(err).Error()
 		resp.Data = map[string]interface{}{}
 		return resp, nil
 	}
