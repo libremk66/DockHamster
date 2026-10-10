@@ -37,6 +37,9 @@ type AutoUpdateSettings struct {
 	NotifyOnFailure  bool            `json:"notifyOnFailure"`
 	// WatchdogDisabled 关闭容器守护告警（异常退出/OOM/重启循环 → 通知）；默认开启
 	WatchdogDisabled bool `json:"watchdogDisabled,optional"`
+	// NotifyBeforeUpdate 定时更新开始前发送提醒（列出即将更新的容器，提醒保存工作）；默认关闭
+	// （定时任务常在半夜，默认开会给所有人多一条夜间消息，需要的人自己开）
+	NotifyBeforeUpdate bool `json:"notifyBeforeUpdate,optional"`
 }
 
 type AutoUpdateStore struct {

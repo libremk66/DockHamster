@@ -115,6 +115,16 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 	serviceContext.AutoUpdateState.SetActive(active)
 	defer serviceContext.AutoUpdateState.ClearActive()
 
+	// 定时更新：正式开始前发一条预告（列出即将更新的容器，提醒保存工作）。
+	// 只对定时触发——手动「立即运行」时用户就在面板前，不需要提醒。
+	if trigger == "auto" {
+		names := make([]string, 0, len(targets))
+		for _, t := range targets {
+			names = append(names, t.name)
+		}
+		notifyBeforeUpdate(serviceContext, names)
+	}
+
 	// 按镜像分组：同一镜像只拉取一次
 	groups := make(map[string][]target)
 	for _, t := range targets {
@@ -199,6 +209,35 @@ func notifyAutoUpdate(serviceContext *svc.ServiceContext, r module.AutoUpdateRun
 }
 
 // composeAutoUpdateMessage 生成通知标题与正文（正文不含标题行，各渠道自行拼接）
+// notifyBeforeUpdate 定时更新开始前发送预告（开关：设置里的 NotifyBeforeUpdate；默认关闭）。
+// 同步发送：确保消息先于任何容器重启送出（代价是开跑前多等一两秒）。
+func notifyBeforeUpdate(serviceContext *svc.ServiceContext, names []string) {
+	settings := serviceContext.AutoUpdate.Get()
+	if !settings.NotifyBeforeUpdate || len(names) == 0 {
+		return
+	}
+	title, text := composeBeforeUpdateMessage(names, time.Now().Format("2006-01-02 15:04"))
+	for _, res := range notify.Send(settings.Notify, title, text) {
+		if res.OK {
+			logx.Infof("更新前提醒已发送: %s", res.Channel)
+		} else {
+			logx.Errorf("更新前提醒发送失败 %s: %s", res.Channel, res.Error)
+		}
+	}
+}
+
+// composeBeforeUpdateMessage 更新前提醒的文案（渠道通用；飞书应用模式会渲染成卡片）
+func composeBeforeUpdateMessage(names []string, ts string) (title, text string) {
+	title = "⏳ DockHamster 更新即将开始 · " + ts
+	var b strings.Builder
+	fmt.Fprintf(&b, "将更新 %d 个容器（会短暂重启）：\n", len(names))
+	for _, n := range names {
+		b.WriteString("· " + n + "\n")
+	}
+	b.WriteString("\n若正在使用以上服务，请先保存工作（编辑中的文档 / 未完成的下载 / 上传中的任务）。\n更新完成后会另发结果简报。")
+	return title, b.String()
+}
+
 func composeAutoUpdateMessage(r module.AutoUpdateRunResult) (title, text string) {
 	title = "🔄 DockHamster 自动更新 " + r.Time
 	if r.Trigger == "group" {
