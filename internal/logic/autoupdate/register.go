@@ -30,6 +30,8 @@ func RegisterCrons(svcCtx *svc.ServiceContext) error {
 			return
 		}
 		utiles.RunAutoUpdate(svcCtx, "auto")
+		// 本轮结束后重挂"更新前提醒"定时器（对准下一次计划时间）
+		utiles.ScheduleBeforeUpdateNotice(svcCtx)
 	})
 	if err != nil {
 		return fmt.Errorf("自动更新计划无效: %w", err)
@@ -50,6 +52,9 @@ func RegisterCrons(svcCtx *svc.ServiceContext) error {
 		return fmt.Errorf("检查更新计划无效: %w", err)
 	}
 	svcCtx.CheckCronID = id2
+
+	// ③ 更新前提醒（提前量）：重算并重挂（启动时、改设置后都会走到这里）
+	utiles.ScheduleBeforeUpdateNotice(svcCtx)
 	return nil
 }
 
