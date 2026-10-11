@@ -33,10 +33,10 @@ func RunComposeBackup(svcCtx *svc.ServiceContext) (fileName string, size int, de
 		if e != nil {
 			emsg = e.Error()
 			logx.Errorf("compose 配置备份失败: %v", e)
-			sendBackupAlert(svcCtx, false, at, e)
 		} else {
 			logx.Infof("compose 配置备份完成: %s（%d 字节，清理 %d 份）", f, n, len(d))
 		}
+		sendBackupNotice(svcCtx, e == nil, at, f, n, len(d), e)
 		svcCtx.ComposeBackup.UpdateLastRun(at, f, e == nil, emsg)
 		return f, n, d, e
 	}
@@ -67,16 +67,31 @@ func RunComposeBackup(svcCtx *svc.ServiceContext) (fileName string, size int, de
 	return finish(fileName, len(res.Data), deleted, nil)
 }
 
-// sendBackupAlert 备份失败通知（走已配置的通知渠道；没配渠道则静默）
-func sendBackupAlert(svcCtx *svc.ServiceContext, ok bool, at string, runErr error) {
+// sendBackupNotice 备份结果通知（走已配置的通知渠道；发送与否受通知区开关控制，没配渠道则静默）：
+// 失败默认通知（NotifyOnBackupFailure）；成功默认不通知（NotifyOnBackupSuccess 打开才发）
+func sendBackupNotice(svcCtx *svc.ServiceContext, ok bool, at, file string, size, pruned int, runErr error) {
 	settings := svcCtx.AutoUpdate.Get()
-	ch := settings.Notify
-	title := "⚠️ " + HostTag(svcCtx) + "compose 配置备份失败 · " + at
-	text := fmt.Sprintf("自动备份没有完成（%s）。\n\n原因：%s\n\n可在「Compose」页 →「自动备份到 WebDAV」检查设置后点「立即备份」重试。",
-		at, runErr.Error())
-	for _, r := range notify.Send(ch, title, text) {
+	if ok && !settings.NotifyOnBackupSuccess {
+		return
+	}
+	if !ok && !settings.NotifyOnBackupFailure {
+		return
+	}
+	var title, text string
+	if ok {
+		title = "✅ " + HostTag(svcCtx) + "compose 配置备份完成 · " + at
+		text = fmt.Sprintf("已上传 %s（%s）。", file, humanBytes(int64(size)))
+		if pruned > 0 {
+			text += fmt.Sprintf("\n按保留策略清理了 %d 份旧备份。", pruned)
+		}
+	} else {
+		title = "⚠️ " + HostTag(svcCtx) + "compose 配置备份失败 · " + at
+		text = fmt.Sprintf("自动备份没有完成（%s）。\n\n原因：%s\n\n可在「Compose」页 →「自动备份到 WebDAV」检查设置后点「立即备份」重试。",
+			at, runErr.Error())
+	}
+	for _, r := range notify.Send(settings.Notify, title, text) {
 		if !r.OK {
-			logx.Errorf("备份告警通知发送失败(%s): %s", r.Channel, r.Error)
+			logx.Errorf("备份通知发送失败(%s): %s", r.Channel, r.Error)
 		}
 	}
 }
