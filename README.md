@@ -110,11 +110,14 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - secretKey=改成你自己的密钥   # 要求：大于8位且非纯数字
-      # 可选：白名单初始值（仅首次生成配置时使用，之后以页面配置为准）
-      # - AutoUpdateContainers=nginx,redis
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/data
+      # 可选：挂载 compose 配置文件所在目录 → 详情见面板「Compose」页
+      # 具体挂载路径请根据 面板「Compose」页的自动检测结果，以下仅为示例
+      # - /opt/stacks:/opt/stacks:ro # 自己写 compose 文件的统一目录
+      # - /volume1/docker:/volume1/docker:ro # 群晖 Container Manager 的项目目录
+      # - /portainer-data:/portainer-data:ro # Portainer 的数据目录（compose/<id>/ 所在处）
     ports:
       - "12712:12712"
 ```
