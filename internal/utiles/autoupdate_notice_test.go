@@ -12,7 +12,7 @@ func TestComposeBeforeUpdateMessage(t *testing.T) {
 		t.Fatalf("标题不对: %q", title)
 	}
 	for _, want := range []string{
-		"将更新 3 个容器",
+		"预计将更新 3 个容器",
 		"· jellyfin", "· qbittorrent", "· immich_server",
 		"请先保存工作",
 		"另发结果简报",

@@ -224,7 +224,15 @@ var (
 	beforeNoticeMu    sync.Mutex
 	beforeNoticeTimer *time.Timer
 	beforeNoticeFired time.Time // 已就本次计划时间发过提醒（防重算/重启导致重复发）
+	beforeNoticeAt    time.Time // 当前已挂的提醒时刻（零值 = 未挂）；供 status 展示"预告几点发"
 )
+
+// NextBeforeNoticeAt 返回"更新前提醒"下次发出的时刻（未挂则零值）
+func NextBeforeNoticeAt() time.Time {
+	beforeNoticeMu.Lock()
+	defer beforeNoticeMu.Unlock()
+	return beforeNoticeAt
+}
 
 // ScheduleBeforeUpdateNotice 重算并挂上"更新前提醒"定时器（幂等，可反复调用）
 func ScheduleBeforeUpdateNotice(serviceContext *svc.ServiceContext) {
@@ -234,6 +242,7 @@ func ScheduleBeforeUpdateNotice(serviceContext *svc.ServiceContext) {
 		beforeNoticeTimer.Stop()
 		beforeNoticeTimer = nil
 	}
+	beforeNoticeAt = time.Time{} // 重新挂之前先视为"未挂"（下面成功挂上时再写入）
 	settings := serviceContext.AutoUpdate.Get()
 	if !settings.NotifyBeforeUpdate || !settings.Enabled || serviceContext.CronEngine == nil || serviceContext.AutoUpdateCronID == 0 {
 		return
@@ -249,9 +258,11 @@ func ScheduleBeforeUpdateNotice(serviceContext *svc.ServiceContext) {
 		delay = 0 // 已进入提醒窗口（刚改完设置/刚启动）：立即提醒一次
 	}
 	plan := next
+	beforeNoticeAt = time.Now().Add(delay)
 	logx.Infof("更新前提醒：已挂（计划 %s，提前 %s，%.0f 秒后发）", plan.Format("15:04"), lead, delay.Seconds())
 	beforeNoticeTimer = time.AfterFunc(delay, func() {
 		beforeNoticeMu.Lock()
+		beforeNoticeAt = time.Time{} // 已发出：界面不再显示"预告将发"
 		if beforeNoticeFired.Equal(plan) {
 			beforeNoticeMu.Unlock()
 			return
@@ -296,7 +307,7 @@ func sendBeforeUpdateNotice(serviceContext *svc.ServiceContext, planAt time.Time
 func composeBeforeUpdateMessage(hostTag string, names []string, ts string) (title, text string) {
 	title = "⏳ " + hostTag + "DockHamster 更新即将开始 · " + ts
 	var b strings.Builder
-	fmt.Fprintf(&b, "将更新 %d 个容器（会短暂重启）：\n", len(names))
+	fmt.Fprintf(&b, "预计将更新 %d 个容器（会短暂重启，以到点时的实际检查为准）：\n", len(names))
 	for _, n := range names {
 		b.WriteString("· " + n + "\n")
 	}

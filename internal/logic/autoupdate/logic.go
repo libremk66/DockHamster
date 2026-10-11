@@ -182,6 +182,10 @@ func (l *AutoUpdateLogic) Status() (*types.Resp, error) {
 		// 通知标题里实际生效的主机标识（供 UI 提示"留空=自动"时展示）
 		"hostLabel": utiles.ResolvedHostLabel(l.svcCtx),
 	}
+	// "更新前提醒"下次发出的时刻（未挂/已发出则为空）——供执行计划卡片展示
+	if at := utiles.NextBeforeNoticeAt(); !at.IsZero() {
+		resp.Data.(map[string]interface{})["nextNoticeAt"] = at.Format("2006-01-02 15:04")
+	}
 	return resp, nil
 }
 
