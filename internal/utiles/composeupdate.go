@@ -114,21 +114,33 @@ func resolveConfigFilesWith(paths []string, roots []string) ([]string, error) {
 // docker compose -f <files...> -p <project> up -d --force-recreate --no-deps <service>
 // 只影响目标 service，不触碰同项目其他容器；--no-deps 避免连带重启依赖服务。
 // 前置条件：compose 文件路径在面板容器内可达（部署时需挂载，见 README）。
-func composeUpService(meta ComposeMeta, force bool, altRoots []string) error {
+func composeUpService(serviceContext *svc.ServiceContext, meta ComposeMeta, force bool) error {
 	bin, subcmd, err := composeBinary()
 	if err != nil {
 		return err
 	}
+	roots := ComposeAltRoots(serviceContext)
 	args := append([]string{}, subcmd...)
-	files, err := resolveConfigFilesWith(meta.ConfigFiles, altRoots)
+	files, err := ResolveConfigFilesSmart(serviceContext, meta.ConfigFiles, roots)
 	if err != nil {
 		return err
 	}
 	for _, f := range files {
 		args = append(args, "-f", f)
 	}
+	// 项目目录同样走统一解析（Portainer 栈的 working_dir 也是容器内视角 /data/compose/<id>）；
+	// 解析不到就退回第一个 compose 文件所在目录（compose 的默认语义）
+	projectDir := ""
 	if meta.WorkingDir != "" {
-		args = append(args, "--project-directory", meta.WorkingDir)
+		if r, dErr := ResolveConfigFilesSmart(serviceContext, []string{meta.WorkingDir}, roots); dErr == nil && len(r) > 0 {
+			projectDir = r[0]
+		}
+	}
+	if projectDir == "" && len(files) > 0 {
+		projectDir = filepath.Dir(files[0])
+	}
+	if projectDir != "" {
+		args = append(args, "--project-directory", projectDir)
 	}
 	args = append(args, "-p", meta.Project, "up", "-d", "--no-deps")
 	if force {
@@ -202,7 +214,7 @@ func UpdateContainerViaCompose(serviceContext *svc.ServiceContext, meta ComposeM
 		}
 	}
 	setMsg(60, fmt.Sprintf("正在 compose 重建 %s", meta.UpdateRef()), false)
-	if err := composeUpService(meta, true, ComposeAltRoots(serviceContext)); err != nil {
+	if err := composeUpService(serviceContext, meta, true); err != nil {
 		return fail(80, err)
 	}
 	newID, err := findComposeContainerID(serviceContext, meta)

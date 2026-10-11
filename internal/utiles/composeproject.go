@@ -1,6 +1,7 @@
 package utiles
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/libremk66/DockHamster/internal/svc"
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 // 「Compose」页（compose 项目视图）的数据构建。
@@ -141,6 +143,51 @@ func sortMountPairs(mounts []composeMountPair) []composeMountPair {
 		return false
 	})
 	return sorted
+}
+
+// CollectMountPairs 扫描全部容器的挂载对（destination→source，含"面板类来源"标记），
+// 供"容器视角路径换算"使用。更新通道/原文接口的兜底解析用它（视图侧在遍历时已自带一份）。
+func CollectMountPairs(svcCtx *svc.ServiceContext) []composeMountPair {
+	list, err := GetContainerList(svcCtx)
+	if err != nil {
+		return nil
+	}
+	var mounts []composeMountPair
+	for _, c := range list {
+		ins, ierr := GetContainerInspect(svcCtx, c.ID)
+		if ierr != nil {
+			continue
+		}
+		for _, m := range ins.Mounts {
+			if m.Destination != "" && m.Source != "" {
+				pair := composeMountPair{destination: m.Destination, source: m.Source}
+				if ins.Config != nil {
+					pair.panelish = isPanelLikeImage(ins.Config.Image)
+				}
+				mounts = append(mounts, pair)
+			}
+		}
+	}
+	return mounts
+}
+
+// ResolveConfigFilesSmart 统一解析 compose 文件路径（视图/原文/更新通道共用同一条链）：
+// 原路径 → 备用根（设置 + 环境变量）→「容器视角 → 宿主路径」换算（逐候选实测可读挑正确的）。
+// 与「Compose」页的可达性判定保持一致，避免"页面显示可读、更新却读不到"的分裂。
+func ResolveConfigFilesSmart(svcCtx *svc.ServiceContext, paths []string, roots []string) ([]string, error) {
+	if len(paths) == 0 {
+		return nil, ErrComposeUnavailable
+	}
+	if resolved, err := resolveConfigFilesWith(paths, roots); err == nil {
+		return resolved, nil
+	}
+	for _, cand := range translatePathCandidates(paths, sortMountPairs(CollectMountPairs(svcCtx))) {
+		if resolved, err := resolveConfigFilesWith(cand.hostFiles, roots); err == nil {
+			logx.Infof("compose 文件路径经容器视角换算: %v -> %v（来源 %s）", paths, resolved, cand.source)
+			return resolved, nil
+		}
+	}
+	return nil, fmt.Errorf("%w：compose 文件不可达 %s（需在面板容器挂载该路径，或用「Compose」页的挂载引导 / 额外根目录）", ErrComposeUnavailable, paths[0])
 }
 
 // BuildComposeProjectsView 构建「Compose」页数据。

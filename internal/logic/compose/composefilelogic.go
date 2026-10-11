@@ -39,7 +39,7 @@ func (l *ComposeFileLogic) ComposeFile(req *types.ComposeFileReq) (resp *types.R
 		resp.Msg = "该容器不是 compose 管理的容器"
 		return resp, nil
 	}
-	files, fErr := utiles.ResolveConfigFilesEx(meta.ConfigFiles, utiles.ComposeAltRoots(l.svcCtx))
+	files, fErr := utiles.ResolveConfigFilesSmart(l.svcCtx, meta.ConfigFiles, utiles.ComposeAltRoots(l.svcCtx))
 	if fErr != nil {
 		resp.Code = 500
 		resp.Msg = fErr.Error()
