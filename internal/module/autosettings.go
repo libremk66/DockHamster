@@ -48,6 +48,9 @@ type AutoUpdateSettings struct {
 	// HostLabel 通知标题里的主机标识（如 nas-01 / 客厅 NAS）；留空 = 自动用 daemon 主机名。
 	// 同一台机器跑多个面板时建议自定义（否则标题区分不开）
 	HostLabel string `json:"hostLabel,optional"`
+	// ComposeExtraRoots 「Compose」页的额外 compose 根目录（绝对路径；与 COMPOSE_ALT_ROOTS 合并生效）。
+	// 面板解析 compose 文件路径时会在这些前缀下探测；只影响面板读文件，不改动容器
+	ComposeExtraRoots []string `json:"composeExtraRoots,optional"`
 }
 
 type AutoUpdateStore struct {
@@ -75,6 +78,7 @@ func (s *AutoUpdateStore) Get() AutoUpdateSettings {
 	d := s.data
 	d.Containers = append([]string{}, d.Containers...)
 	d.Exclude = append([]string{}, d.Exclude...)
+	d.ComposeExtraRoots = append([]string{}, d.ComposeExtraRoots...)
 	if d.ContainerPolicy != nil {
 		cp := make(map[string]string, len(d.ContainerPolicy))
 		for k, v := range d.ContainerPolicy {

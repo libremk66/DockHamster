@@ -16,6 +16,7 @@ import (
 	image "github.com/libremk66/DockHamster/internal/handler/image"
 	migrate "github.com/libremk66/DockHamster/internal/handler/migrate"
 	progress "github.com/libremk66/DockHamster/internal/handler/progress"
+	projects "github.com/libremk66/DockHamster/internal/handler/projects"
 	selfupdate "github.com/libremk66/DockHamster/internal/handler/selfupdate"
 	snapshot "github.com/libremk66/DockHamster/internal/handler/snapshot"
 	version "github.com/libremk66/DockHamster/internal/handler/version"
@@ -296,6 +297,23 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Method:  http.MethodPost,
 				Path:    "/selfUpdate/run",
 				Handler: selfupdate.RunHandler(serverCtx),
+			},
+		},
+		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
+		rest.WithPrefix("/api"),
+	)
+
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				Method:  http.MethodGet,
+				Path:    "/projects",
+				Handler: projects.ListHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/projects/roots",
+				Handler: projects.SaveRootsHandler(serverCtx),
 			},
 		},
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),

@@ -1,0 +1,41 @@
+package projects
+
+import (
+	"net/http"
+
+	"github.com/libremk66/DockHamster/internal/logic/projects"
+	"github.com/libremk66/DockHamster/internal/svc"
+	"github.com/libremk66/DockHamster/internal/types"
+	"github.com/zeromicro/go-zero/rest/httpx"
+)
+
+func write(w http.ResponseWriter, r *http.Request, resp *types.Resp, err error) {
+	if err != nil {
+		httpx.WriteJson(w, resp.Code, resp)
+	} else {
+		httpx.OkJsonCtx(r.Context(), w, resp)
+	}
+}
+
+// ListHandler GET /api/projects —— 「Compose」页（compose 项目视图）
+func ListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := projects.NewProjectsListLogic(r.Context(), svcCtx)
+		resp, err := l.ProjectsList()
+		write(w, r, resp, err)
+	}
+}
+
+// SaveRootsHandler POST /api/projects/roots —— 保存额外 compose 根目录
+func SaveRootsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req projects.SaveRootsReq
+		if err := httpx.Parse(r, &req); err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+		l := projects.NewSaveRootsLogic(r.Context(), svcCtx)
+		resp, err := l.SaveRoots(&req)
+		write(w, r, resp, err)
+	}
+}

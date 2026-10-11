@@ -71,11 +71,22 @@ func altRootPrefixes() []string {
 	return roots
 }
 
-// ResolveConfigFiles 将 compose 文件路径解析为面板容器内可达的路径。
+// ResolveConfigFiles 将 compose 文件路径解析为面板容器内可达的路径（仅环境变量备用根；
+// 更新通道请用 ResolveConfigFilesEx + ComposeAltRoots，把「Compose」页设置的额外根目录也带上）。
+func ResolveConfigFiles(paths []string) ([]string, error) {
+	return resolveConfigFilesWith(paths, altRootPrefixes())
+}
+
+// ResolveConfigFilesEx 同 ResolveConfigFiles，但显式传入备用根
+// （调用方通常传 ComposeAltRoots —— 环境变量 + 设置的合并结果）
+func ResolveConfigFilesEx(paths []string, roots []string) ([]string, error) {
+	return resolveConfigFilesWith(paths, roots)
+}
+
+// resolveConfigFilesWith 将 compose 文件路径解析为面板容器内可达的路径。
 // labels 记录的是容器创建时宿主机视角的路径，面板容器内该路径不一定一致。
 // 策略：原路径可达则原样使用；否则按备用根前缀逐一探测替换，全部不可达才报错。
-func ResolveConfigFiles(paths []string) ([]string, error) {
-	roots := altRootPrefixes()
+func resolveConfigFilesWith(paths []string, roots []string) ([]string, error) {
 	resolved := make([]string, len(paths))
 	for i, p := range paths {
 		resolved[i] = p
@@ -91,7 +102,7 @@ func ResolveConfigFiles(paths []string) ([]string, error) {
 			}
 		}
 		if alt == "" {
-			return nil, fmt.Errorf("%w：compose 文件不可达 %s（面板容器需挂载该路径，或用 COMPOSE_ALT_ROOTS 配置备用前缀）", ErrComposeUnavailable, p)
+			return nil, fmt.Errorf("%w：compose 文件不可达 %s（需在面板容器挂载该路径，或在「Compose」页设置额外根目录）", ErrComposeUnavailable, p)
 		}
 		logx.Infof("compose 文件路径解析: %s -> %s", p, alt)
 		resolved[i] = alt
@@ -103,13 +114,13 @@ func ResolveConfigFiles(paths []string) ([]string, error) {
 // docker compose -f <files...> -p <project> up -d --force-recreate --no-deps <service>
 // 只影响目标 service，不触碰同项目其他容器；--no-deps 避免连带重启依赖服务。
 // 前置条件：compose 文件路径在面板容器内可达（部署时需挂载，见 README）。
-func composeUpService(meta ComposeMeta, force bool) error {
+func composeUpService(meta ComposeMeta, force bool, altRoots []string) error {
 	bin, subcmd, err := composeBinary()
 	if err != nil {
 		return err
 	}
 	args := append([]string{}, subcmd...)
-	files, err := ResolveConfigFiles(meta.ConfigFiles)
+	files, err := resolveConfigFilesWith(meta.ConfigFiles, altRoots)
 	if err != nil {
 		return err
 	}
@@ -191,7 +202,7 @@ func UpdateContainerViaCompose(serviceContext *svc.ServiceContext, meta ComposeM
 		}
 	}
 	setMsg(60, fmt.Sprintf("正在 compose 重建 %s", meta.UpdateRef()), false)
-	if err := composeUpService(meta, true); err != nil {
+	if err := composeUpService(meta, true, ComposeAltRoots(serviceContext)); err != nil {
 		return fail(80, err)
 	}
 	newID, err := findComposeContainerID(serviceContext, meta)

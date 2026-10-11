@@ -225,3 +225,16 @@ service dockerCopilot {
 	@handler groupUpdate
 	post /container/:id/updateGroup (GroupUpdateReq) returns (Resp)
 }
+
+@server(
+	prefix: /api
+	group: projects
+	jwt: Auth
+)
+service dockerCopilot {
+	@handler list
+	get /projects returns (Resp)
+
+	@handler saveRoots
+	post /projects/roots returns (Resp)
+}
