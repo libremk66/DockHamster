@@ -31,14 +31,17 @@ type ServiceContext struct {
 	// 任务历史（持久化；「任务」页历史记录标签用）
 	TaskHistory *module.TaskHistoryStore
 	// 镜像加速源（UI 配）
-	Accelerator      *module.AcceleratorStore
-	AutoUpdateState  *module.AutoUpdateState
-	AutoUpdateCheck  *module.CheckState
-	CronEngine       *cron.Cron
-	AutoUpdateCronID cron.EntryID
-	CheckCronID      cron.EntryID
-	CronMu           sync.Mutex
-	mu               sync.Mutex
+	Accelerator *module.AcceleratorStore
+	// Compose 配置自动备份（WebDAV，UI 配）
+	ComposeBackup       *module.ComposeBackupStore
+	AutoUpdateState     *module.AutoUpdateState
+	AutoUpdateCheck     *module.CheckState
+	CronEngine          *cron.Cron
+	AutoUpdateCronID    cron.EntryID
+	CheckCronID         cron.EntryID
+	ComposeBackupCronID cron.EntryID
+	CronMu              sync.Mutex
+	mu                  sync.Mutex
 }
 
 type TaskProgress struct {
@@ -74,6 +77,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Accelerator:     module.NewAcceleratorStore(),
 		AutoUpdateState: module.NewAutoUpdateState(),
 		AutoUpdateCheck: module.NewCheckState(),
+		ComposeBackup:   module.NewComposeBackupStore(),
 	}
 }
 

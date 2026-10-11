@@ -15,6 +15,7 @@ import (
 	"github.com/libremk66/DockHamster/internal/config"
 	"github.com/libremk66/DockHamster/internal/handler"
 	"github.com/libremk66/DockHamster/internal/logic/autoupdate"
+	"github.com/libremk66/DockHamster/internal/logic/composebackup"
 	"github.com/libremk66/DockHamster/internal/selfupdate"
 	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/libremk66/DockHamster/internal/utiles"
@@ -129,6 +130,9 @@ export const customImageLogos = {
 		logx.Errorf("自动更新定时任务注册失败(检查 cron 表达式): %v", err)
 	} else {
 		logx.Info("自动更新任务已注册，调度: " + ctx.AutoUpdate.Get().Cron)
+	}
+	if err := composebackup.RegisterBackupCron(ctx); err != nil {
+		logx.Errorf("compose 配置备份定时任务注册失败: %v", err)
 	}
 	defer corndanmu.Stop()
 	httpx.SetErrorHandler(func(err error) (int, any) {

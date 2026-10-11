@@ -10,6 +10,7 @@ import (
 	auth "github.com/libremk66/DockHamster/internal/handler/auth"
 	autoupdate "github.com/libremk66/DockHamster/internal/handler/autoupdate"
 	compose "github.com/libremk66/DockHamster/internal/handler/compose"
+	composebackup "github.com/libremk66/DockHamster/internal/handler/composebackup"
 	container "github.com/libremk66/DockHamster/internal/handler/container"
 	favicon "github.com/libremk66/DockHamster/internal/handler/favicon"
 	icons "github.com/libremk66/DockHamster/internal/handler/icons"
@@ -314,6 +315,38 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Method:  http.MethodPost,
 				Path:    "/projects/roots",
 				Handler: projects.SaveRootsHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/projects/export",
+				Handler: projects.ExportHandler(serverCtx),
+			},
+		},
+		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
+		rest.WithPrefix("/api"),
+	)
+
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				Method:  http.MethodGet,
+				Path:    "/composeBackup/settings",
+				Handler: composebackup.GetSettingsHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/composeBackup/settings",
+				Handler: composebackup.SaveSettingsHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/composeBackup/test",
+				Handler: composebackup.TestHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/composeBackup/run",
+				Handler: composebackup.RunHandler(serverCtx),
 			},
 		},
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),

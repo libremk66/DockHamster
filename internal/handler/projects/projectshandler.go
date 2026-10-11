@@ -2,6 +2,7 @@ package projects
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/libremk66/DockHamster/internal/logic/projects"
 	"github.com/libremk66/DockHamster/internal/svc"
@@ -23,6 +24,23 @@ func ListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		l := projects.NewProjectsListLogic(r.Context(), svcCtx)
 		resp, err := l.ProjectsList()
 		write(w, r, resp, err)
+	}
+}
+
+// ExportHandler GET /api/projects/export[?project=名] —— 打包下载 compose 配置（zip 附件）
+func ExportHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		project := r.URL.Query().Get("project")
+		l := projects.NewExportLogic(r.Context(), svcCtx)
+		res, name, err := l.Export(project)
+		if err != nil {
+			httpx.WriteJson(w, 500, &types.Resp{Code: 500, Msg: err.Error(), Data: map[string]interface{}{}})
+			return
+		}
+		w.Header().Set("Content-Type", "application/zip")
+		w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+		w.Header().Set("Content-Length", strconv.Itoa(len(res.Data)))
+		_, _ = w.Write(res.Data)
 	}
 }
 
