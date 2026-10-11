@@ -239,7 +239,7 @@ service dockerCopilot {
 	post /projects/roots returns (Resp)
 
 	@handler export
-	get /projects/export returns (Resp)
+	post /projects/export returns (Resp)
 
 	@handler backupSettings
 	get /composeBackup/settings returns (Resp)

@@ -41,7 +41,7 @@ func RunComposeBackup(svcCtx *svc.ServiceContext) (fileName string, size int, de
 		return f, n, d, e
 	}
 
-	res, berr := BuildComposeConfigZip(svcCtx, "")
+	res, berr := BuildComposeConfigZip(svcCtx, "", st.ZipPassword)
 	if berr != nil {
 		return finish("", 0, nil, berr)
 	}
@@ -77,10 +77,14 @@ func sendBackupNotice(svcCtx *svc.ServiceContext, ok bool, at, file string, size
 	if !ok && !settings.NotifyOnBackupFailure {
 		return
 	}
+	enc := ""
+	if strings.TrimSpace(svcCtx.ComposeBackup.Get().ZipPassword) != "" {
+		enc = "（AES-256 加密）"
+	}
 	var title, text string
 	if ok {
 		title = "✅ " + HostTag(svcCtx) + "compose 配置备份完成 · " + at
-		text = fmt.Sprintf("已上传 %s（%s）。", file, humanBytes(int64(size)))
+		text = fmt.Sprintf("已上传 %s（%s）%s。", file, humanBytes(int64(size)), enc)
 		if pruned > 0 {
 			text += fmt.Sprintf("\n按保留策略清理了 %d 份旧备份。", pruned)
 		}

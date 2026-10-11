@@ -27,9 +27,10 @@ func NewExportLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ExportLogi
 
 var unsafeFileChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
-// Export 打包 compose 配置（project 为空 = 全部可读项目），返回 zip 内容与建议文件名
-func (l *ExportLogic) Export(project string) (*utiles.ComposeExportResult, string, error) {
-	res, err := utiles.BuildComposeConfigZip(l.svcCtx, project)
+// Export 打包 compose 配置（project 为空 = 全部可读项目；password 非空 = AES-256 加密），
+// 返回 zip 内容与建议文件名
+func (l *ExportLogic) Export(project, password string) (*utiles.ComposeExportResult, string, error) {
+	res, err := utiles.BuildComposeConfigZip(l.svcCtx, project, password)
 	if err != nil {
 		return nil, "", err
 	}

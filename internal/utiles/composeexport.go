@@ -1,18 +1,49 @@
 package utiles
 
 import (
-	"archive/zip"
+	stdzip "archive/zip"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
+	aeszip "github.com/yeka/zip"
+
 	"github.com/libremk66/DockHamster/internal/config"
 	"github.com/libremk66/DockHamster/internal/svc"
 )
+
+// zipEntryWriter 打包器抽象：明文走标准库，填了密码走 WinZip AES-256（7-Zip 等可解）
+type zipEntryWriter interface {
+	CreateEntry(name string) (io.Writer, error)
+	Close() error
+}
+
+type plainZipWriter struct{ w *stdzip.Writer }
+
+func (p *plainZipWriter) CreateEntry(name string) (io.Writer, error) { return p.w.Create(name) }
+func (p *plainZipWriter) Close() error                               { return p.w.Close() }
+
+type aesZipWriter struct {
+	w        *aeszip.Writer
+	password string
+}
+
+func (a *aesZipWriter) CreateEntry(name string) (io.Writer, error) {
+	return a.w.Encrypt(name, a.password, aeszip.AES256Encryption)
+}
+func (a *aesZipWriter) Close() error { return a.w.Close() }
+
+func newZipEntryWriter(buf *bytes.Buffer, password string) zipEntryWriter {
+	if strings.TrimSpace(password) == "" {
+		return &plainZipWriter{w: stdzip.NewWriter(buf)}
+	}
+	return &aesZipWriter{w: aeszip.NewWriter(buf), password: password}
+}
 
 // Compose 配置打包（导出下载 / WebDAV 备份共用）：
 // 把「可读」项目的 compose 文件原样收进 zip（保留原文件名），并把同目录 .env 一并带上；
@@ -26,8 +57,9 @@ type ComposeExportResult struct {
 	Skipped  int    // 跳过项目数（不可读等）
 }
 
-// BuildComposeConfigZip onlyProject 为空 = 全部可读项目；否则只打包指定项目（不存在/不可读时报错）
-func BuildComposeConfigZip(svcCtx *svc.ServiceContext, onlyProject string) (*ComposeExportResult, error) {
+// BuildComposeConfigZip onlyProject 为空 = 全部可读项目；否则只打包指定项目（不存在/不可读时报错）。
+// password 非空时整包 AES-256 加密（WinZip AES；Linux 用 7z x 解、Windows 用 7-Zip 解）。
+func BuildComposeConfigZip(svcCtx *svc.ServiceContext, onlyProject, password string) (*ComposeExportResult, error) {
 	// selfContainerID 传空：导出不需要"面板自身"信息（只影响挂载片段的 service 名）
 	view, err := BuildComposeProjectsView(svcCtx, "")
 	if err != nil {
@@ -37,10 +69,14 @@ func BuildComposeConfigZip(svcCtx *svc.ServiceContext, onlyProject string) (*Com
 	root := "compose-backup-" + ts + "/"
 
 	buf := &bytes.Buffer{}
-	zw := zip.NewWriter(buf)
+	zw := newZipEntryWriter(buf, password)
 	res := &ComposeExportResult{}
 	var manifest strings.Builder
-	fmt.Fprintf(&manifest, "DockHamster compose 配置备份\n生成时间：%s\n面板版本：%s\n\n", time.Now().Format("2006-01-02 15:04:05"), config.Version)
+	encNote := "未加密"
+	if strings.TrimSpace(password) != "" {
+		encNote = "AES-256 加密（解压：Linux `7z x 包名.zip` / Windows 用 7-Zip）"
+	}
+	fmt.Fprintf(&manifest, "DockHamster compose 配置备份\n生成时间：%s\n面板版本：%s\n加密：%s\n\n", time.Now().Format("2006-01-02 15:04:05"), config.Version, encNote)
 
 	matched := false
 	projects := make([]ComposeProjectView, len(view.Projects))
@@ -91,7 +127,7 @@ func BuildComposeConfigZip(svcCtx *svc.ServiceContext, onlyProject string) (*Com
 	}
 
 	// 清单入包
-	w, werr := zw.Create(root + "MANIFEST.txt")
+	w, werr := zw.CreateEntry(root + "MANIFEST.txt")
 	if werr == nil {
 		_, _ = w.Write([]byte(manifest.String()))
 	}
@@ -113,12 +149,12 @@ func stateReason(state string) string {
 	}
 }
 
-func addFileToZip(zw *zip.Writer, name, srcPath string) error {
+func addFileToZip(zw zipEntryWriter, name, srcPath string) error {
 	data, err := os.ReadFile(srcPath)
 	if err != nil {
 		return err
 	}
-	w, err := zw.Create(name)
+	w, err := zw.CreateEntry(name)
 	if err != nil {
 		return err
 	}

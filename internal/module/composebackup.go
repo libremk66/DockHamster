@@ -20,6 +20,8 @@ type ComposeBackupSettings struct {
 	RemoteDir string `json:"remoteDir,optional"` // 相对根地址的目录（如 dockhamster/compose）
 	Cron      string `json:"cron,optional"`      // 备份计划（标准 5 段 cron），默认每天 03:00
 	Keep      int    `json:"keep,optional"`      // 远端保留份数（0=不清理）
+	// ZipPassword 备份包加密密码（可选；非空 = AES-256 加密 zip，解压需 7-Zip/7z）
+	ZipPassword string `json:"zipPassword,optional"`
 	// 最近一次结果（服务端维护）
 	LastRun   string `json:"lastRun,optional"`   // 时间
 	LastOK    bool   `json:"lastOk,optional"`    // 是否成功

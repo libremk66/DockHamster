@@ -317,7 +317,7 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Handler: projects.SaveRootsHandler(serverCtx),
 			},
 			{
-				Method:  http.MethodGet,
+				Method:  http.MethodPost,
 				Path:    "/projects/export",
 				Handler: projects.ExportHandler(serverCtx),
 			},

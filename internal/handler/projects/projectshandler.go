@@ -27,12 +27,22 @@ func ListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	}
 }
 
-// ExportHandler GET /api/projects/export[?project=名] —— 打包下载 compose 配置（zip 附件）
+// ExportReq 导出请求（POST：密码走 body，避免出现在 URL/访问日志里）
+type ExportReq struct {
+	Project  string `json:"project,optional"`
+	Password string `json:"password,optional"`
+}
+
+// ExportHandler POST /api/projects/export —— 打包下载 compose 配置（zip 附件；password 非空 = AES-256）
 func ExportHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		project := r.URL.Query().Get("project")
+		var req ExportReq
+		if err := httpx.Parse(r, &req); err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
 		l := projects.NewExportLogic(r.Context(), svcCtx)
-		res, name, err := l.Export(project)
+		res, name, err := l.Export(req.Project, req.Password)
 		if err != nil {
 			httpx.WriteJson(w, 500, &types.Resp{Code: 500, Msg: err.Error(), Data: map[string]interface{}{}})
 			return
