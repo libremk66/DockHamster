@@ -4,7 +4,7 @@ import "testing"
 
 func TestSanitizeHostLabel(t *testing.T) {
 	cases := map[string]string{
-		"  nas-01  ":                       "nas-01",
+		"  nas-01  ":                      "nas-01",
 		"客厅\nNAS":                         "客厅 NAS", // 换行压成空格
 		"a\t\tb":                          "a b",    // 连续空白压成一个
 		"":                                "",
