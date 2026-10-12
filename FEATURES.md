@@ -163,13 +163,28 @@ checksums.txt      校验和（sha256sum -c 可验证完整性）
 
 > 架构说明：镜像搬运记录使用 `transports[]` 数组（当前实现 `archive`；`registry` 为预留扩展位），导入端按 `本地已有 → 包内 → registry` 顺序兜底——后续接入自建 registry / Docker Hub 私有仓库是纯增量。
 
-### 11. 更新健康校验与自动回滚
+### 11. Compose 项目支持
+
+从「容器视角」升级到「项目视角」：按容器 labels 自动聚合出**项目 → 服务**分组视图，每个项目标注 compose 文件**可达性**（✅ 可读 / ⚠️ 需挂载），面板类来源（如 Portainer 容器内路径）自动换算成宿主真实路径。
+
+- **挂载引导**：检测到"需挂载"的项目时给出可直接复制的挂载片段（compose / docker run 两种写法），左右路径一致、只读 `:ro` 即可
+- **查看原文 / 日志**：可读项目可查看 compose 原文与容器日志（只读弹窗，日志可刷新复制）
+- **变量体检**：文件里的 `${X}` 在面板侧解析不了时明确提示（这类栈的变量多半存在面板数据库里，更新前注意核对）
+- **更新走 compose 原生语义**：`docker compose up -d --force-recreate --no-deps <service>` —— 只重建目标服务、不触碰同项目其他容器、不产生配置漂移；文件不可读或无 compose 命令时自动回退 API 重建并在进度里明确提示，compose 命令真正执行失败则按错误返回、不回退
+- **路径修正（额外根目录）**：同一数据卷在宿主上有多个挂载视角时用它兜底；也兼容环境变量 `COMPOSE_ALT_ROOTS`（逗号分隔前缀）
+
+### 12. 配置导出与 WebDAV 自动备份
+
+- **导出配置**：一键打包可读项目的 compose 文件（含同目录 `.env`）下载，支持全部 / 单项目；可选 **AES-256 密码加密**（解压用 `7z x` / 7-Zip）
+- **自动备份到 WebDAV**：零依赖客户端，按 cron 计划把配置包上传到你的 WebDAV（群晖 / 坚果云 / Nextcloud / Alist 等）；支持远端**保留份数**（超量自动删最旧）、可选加密、「测试连接」与「立即备份」；失败走通知渠道（开关在「自动更新」页通知区，失败默认开、成功默认关）
+
+### 13. 更新健康校验与自动回滚
 
 更新的最后一步是**健康校验**：启动新容器后连续 3 次检查处于运行且未重启（约 6 秒）即通过；容器自带 `HEALTHCHECK` 时按它的结果等待（上限约 90 秒）。
 
 出现以下任一情况判失败并**自动回滚**：启动后退出、反复重启（Restarting）、被 OOM 杀掉、健康检查 unhealthy。回滚动作：删除不健康的新容器 → 把备份的旧容器改回原名并启动（原本是停止状态的保持停止）。**创建新容器失败、启动失败同样回滚**——更新失败不会把服务撂倒。校验中间状态实时显示在进度里（`新容器运行正常（1/3）`）。
 
-### 12. 容器异常守护
+### 14. 容器异常守护
 
 面板每 60 秒巡检一次（首次采样只建基线，避免启动时误报）：
 
@@ -180,14 +195,14 @@ checksums.txt      校验和（sha256sum -c 可验证完整性）
 
 面板主动发起的停止/重启/更新会先登记**静默窗口**（停止 10 分钟 / 重启 3 分钟 / 更新 15 分钟），窗口内不告警；同容器同类告警 30 分钟冷却。开关在「自动更新页 → 通知卡片 → 容器异常告警」（默认开），走同一套通知渠道。
 
-### 13. 镜像加速源 + 加速拉取
+### 15. 镜像加速源 + 加速拉取
 
 - 加速源列表可增删，**一键并发测速**（对 `https://<源>/v2/` 探针，200/401 视为可用），按延迟排序，可设默认源
 - 「**加速拉取**」：把 Docker Hub 镜像按 `源/library/nginx:tag` 拉取，完成后自动打回原始镜像名并清理临时标签；仅 Docker Hub 镜像可用（ghcr.io 等不显示入口）
 - 「**更新时自动走加速源**」：开启后更新流程优先走默认加速源，失败自动回退直连；非 Hub 镜像不受影响
 - 配置持久化在 `/data/config/accelerator.json`
 
-### 14. 面板自更新（接力容器）
+### 16. 面板自更新（接力容器）
 
 容器无法在自身进程内"停掉自己再重建"（stop 自己的瞬间流程即中断），因此用一次性**接力容器**完成替换：
 
@@ -198,7 +213,7 @@ checksums.txt      校验和（sha256sum -c 可验证完整性）
 
 入口：侧栏「有新版本」弹窗的「**立即更新面板**」；容器页对 `dockhamster` 容器点「更新」也会自动切换到该流程（容器行带「本面板」标识）。前提是新镜像包含该逻辑（v1.4.0 起）。
 
-### 15. Web 端口直达 + favicon
+### 17. Web 端口直达 + favicon
 
 - `/api/containers` 增加 `ports` 字段（容器对外发布的 TCP 端口：去重、升序、**跳过仅绑回环的**）；容器行渲染为可点按钮，点击新标签打开 `http://<当前面板主机>:<端口>`
 - 图标优先级：容器自带/内置/自定义 logo → 容器网页 favicon（后端解析 `<link rel=icon>`，前端缓存 7 天）→ 渐变占位
@@ -217,6 +232,7 @@ checksums.txt      校验和（sha256sum -c 可验证完整性）
 | `AutoUpdateConfigFile` | `/data/config/autoUpdate.json` | 配置文件路径覆盖 |
 | `AcceleratorConfigFile` | `/data/config/accelerator.json` | 加速源配置路径覆盖 |
 | `DelOldContainer` | `true` | 既有变量：更新后是否删除旧容器（`false` 保留改名后的旧容器） |
+| `COMPOSE_ALT_ROOTS` | 空 | Compose 文件备用根前缀，逗号分隔；同一数据卷在面板里挂到别的路径时兜底（也可在「Compose」页高级设置里配置） |
 
 ## 三、API 一览（定制部分）
 
@@ -253,6 +269,14 @@ checksums.txt      校验和（sha256sum -c 可验证完整性）
 | GET | `/api/selfUpdate/status` | 面板自更新状态（当前版本 / 自身容器 / 上次更新结果） |
 | POST | `/api/selfUpdate/run` | 一键面板自更新（异步返回 taskID） |
 | GET | `/api/favicon/resolve?url=` | 解析目标页面 favicon（抓 `<link rel=icon>`，失败回落 /favicon.ico） |
+| GET | `/api/projects` | Compose 项目列表（按 label 聚合，含服务明细 / 文件可达性 / 换算后路径） |
+| POST | `/api/projects/roots` | 保存 Compose 额外根目录设置 |
+| GET | `/api/projects/export?project=` | 导出配置包（zip：compose 原件 + 同目录 .env + MANIFEST；可选密码加密） |
+| GET/POST | `/api/composeBackup/settings` | WebDAV 自动备份设置（读取 / 保存，保存即重排 cron） |
+| POST | `/api/composeBackup/test` | WebDAV 连通性测试 |
+| POST | `/api/composeBackup/run` | 立即执行一次备份（异步） |
+| GET | `/api/container/:id/composefile` | 查看容器所属 compose 项目原文（只读） |
+| GET | `/api/container/:id/logs` | 容器终端日志（最近 200 行，只读） |
 
 ## 四、代码位置（定制改动集中在）
 

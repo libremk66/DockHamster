@@ -87,6 +87,12 @@
 
 ![迁移导入预检](docs/screenshots/migrate-import.png)
 
+**「Compose」页**（项目 → 服务分组视图，文件可达性标注；可读项目支持查看 compose 原文与容器日志）：
+
+![Compose 页](docs/screenshots/compose.png)
+
+![查看原文](docs/screenshots/compose-file.png)
+
 **自动更新页**（执行计划 / 白名单 / 旧镜像策略）：
 
 ![自动更新页](docs/screenshots/auto-update.png)
