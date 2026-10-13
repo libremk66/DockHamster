@@ -168,6 +168,9 @@ service dockerCopilot {
 	@handler imagesList
 	get /images returns (Resp)
 
+	@handler imagesPrune
+	post /image/prune returns (Resp)
+
 	@handler remove
 	delete /image/:id (RemoveImageReq) returns (Resp)
 }
