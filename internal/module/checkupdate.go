@@ -87,7 +87,7 @@ func (i *ImageUpdateData) CheckUpdate(cli DockerInspector, imageList []types.Ima
 
 	// 并发检查（限流 6）：经代理解析 registry 单次约 1~2 秒，
 	// 串行检查 50+ 镜像要 1~2 分钟（UI 的「检查更新」按钮会等到超时），并发后约 10~20 秒。
-	const workers = 6
+	workers := max(len(imageList)/4, 6)
 	sem := make(chan struct{}, workers)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
