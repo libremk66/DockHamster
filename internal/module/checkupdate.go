@@ -212,6 +212,9 @@ func (i *ImageUpdateData) resolveRemoteDigest(cli DockerInspector, image types.I
 		if derr == nil && dist.Descriptor.Digest != "" {
 			return dist.Descriptor.Digest.String(), "daemon", nil
 		}
+		if derr != nil && isPermanentCheckError(derr) {
+			return "", "daemon", derr
+		}
 		logx.Infof("守护进程通道查询 %s 失败，回退自建 HTTP：%v", ref, derr)
 	}
 	// ② 回退：自己发 HTTP（token + HEAD；国内会被解析到加速站）
