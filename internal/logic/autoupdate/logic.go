@@ -101,6 +101,14 @@ func (l *AutoUpdateLogic) CheckNow() (resp *types.Resp, err error) {
 func (l *AutoUpdateLogic) CheckStatus() (resp *types.Resp, err error) {
 	resp = &types.Resp{}
 	data := l.svcCtx.AutoUpdateCheck.Snapshot()
+	containers, _ := utiles.GetContainerList(l.svcCtx)
+	affected := 0
+	for _, container := range containers {
+		if l.svcCtx.HubImageInfo.NeedUpdate(container.ImageID) {
+			affected++
+		}
+	}
+	data["affectedContainers"] = affected
 	_, nextCheck := l.nextRuns()
 	data["nextCheckAt"] = nextCheck
 	resp.Code = 200
