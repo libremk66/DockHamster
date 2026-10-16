@@ -113,8 +113,9 @@ func splitImageNameAndTag(imagesList []MyType.Image) []MyType.Image {
 	for i, imageInfo := range imagesList {
 		imagesList[i].Tags = imageInfo.RepoTags
 		if len(imageInfo.RepoTags) != 0 {
-			imagesList[i].ImageName = strings.Split(imageInfo.RepoTags[0], ":")[0]
-			imagesList[i].ImageTag = strings.Split(imageInfo.RepoTags[0], ":")[1]
+			name, tag := splitTaggedReference(imageInfo.RepoTags[0])
+			imagesList[i].ImageName = name
+			imagesList[i].ImageTag = tag
 		} else if len(imageInfo.RepoDigests) != 0 {
 			imagesList[i].ImageName = strings.Split(imageInfo.RepoDigests[0], "@")[0]
 			imagesList[i].ImageTag = "None"
@@ -125,6 +126,17 @@ func splitImageNameAndTag(imagesList []MyType.Image) []MyType.Image {
 	}
 	return imagesList
 }
+
+func splitTaggedReference(reference string) (string, string) {
+	if at := strings.Index(reference, "@"); at >= 0 {
+		return reference[:at], "None"
+	}
+	if colon := strings.LastIndex(reference, ":"); colon > strings.LastIndex(reference, "/") {
+		return reference[:colon], reference[colon+1:]
+	}
+	return reference, "latest"
+}
+
 func checkImageInUsed(svc *svc.ServiceContext, imageList []MyType.Image) ([]MyType.Image, error) {
 	list, err := GetContainerList(svc)
 	if err != nil {
