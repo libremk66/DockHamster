@@ -126,6 +126,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Handler: image.PruneIntermediateHandler(serverCtx),
 			},
 			{
+				Method:  http.MethodPost,
+				Path:    "/image/prune",
+				Handler: image.ImagesPruneHandler(serverCtx),
+			},
+			{
 				Method:  http.MethodGet,
 				Path:    "/resources/unused",
 				Handler: resources.StatHandler(serverCtx),
