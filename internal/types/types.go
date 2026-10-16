@@ -108,6 +108,13 @@ type RemoveImageReq struct {
 	Force bool `form:"force,default=false"`
 }
 
+// PruneResourcesReq 「资源清理」页的清理请求（三类独立开关，至少选一）。
+type PruneResourcesReq struct {
+	Volumes        bool `form:"volumes,default=false"`
+	ProjectVolumes bool `form:"projectVolumes,default=false"`
+	Networks       bool `form:"networks,default=false"`
+}
+
 type RenameContainerReq struct {
 	OldName string `json:"oldName"`
 	NewName string `json:"newName"`

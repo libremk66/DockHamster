@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/libremk66/DockHamster/internal/config"
@@ -40,6 +41,16 @@ type UnauthorizedResponse struct {
 	Data map[string]interface{} `json:"data"`
 }
 
+// isAllDigits 判断字符串是否为纯数字（secretKey 强度校验用）。
+func isAllDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return len(s) > 0
+}
+
 func main() {
 	// 接力自更新模式：由 selfupdate.Launch 以新镜像启动的一次性容器进入（必须最先判断）
 	if os.Getenv(selfupdate.EnvFlag) == "1" {
@@ -62,6 +73,24 @@ func main() {
 		logx.Errorf("请确认secretKey设置正确，要求非纯数字且大于八位")
 		os.Exit(1)
 	}
+	// 鉴权密钥必须非空：空值会让登录接口"空 key 即通过"，任何人都能拿到
+	// 用空密钥自签的 JWT，面板等于无鉴权（上游 issue #167 同源问题）。
+	// 配置错误必须"启动即失败"，而不是静默退化成无鉴权。
+	secret := strings.TrimSpace(c.Auth.AccessSecret)
+	if secret == "" {
+		logx.Errorf("secretKey 未设置（当前为空）")
+		logx.Errorf("请通过环境变量设置：secretKey=你的登录密钥（要求大于 8 位且非纯数字）")
+		logx.Errorf("示例：docker run 加 -e secretKey=xxxx 或在 compose 的 environment 中配置")
+		os.Exit(1)
+	}
+	if len([]rune(secret)) < 8 {
+		logx.Errorf("secretKey 过短（%d 位），至少需要 8 位且非纯数字", len([]rune(secret)))
+		os.Exit(1)
+	}
+	if isAllDigits(secret) {
+		logx.Errorf("secretKey 不能是纯数字（安全性不足），请改用字母+数字组合")
+		os.Exit(1)
+	}
 	server := rest.MustNewServer(c.RestConf, rest.WithCors("*"), rest.WithUnauthorizedCallback(
 		func(w http.ResponseWriter, r *http.Request, err error) {
 			response := UnauthorizedResponse{
@@ -72,6 +101,8 @@ func main() {
 			httpx.WriteJson(w, http.StatusUnauthorized, response)
 		}))
 	defer server.Stop()
+	// 全局安全响应头（防点击劫持/MIME 嗅探；见 securityheaders.go）
+	server.Use(handler.SecurityHeaders)
 	ctx := svc.NewServiceContext(c)
 
 	// 上次自更新结果上报（如有）：写日志 + 发通知，结果只消费一次

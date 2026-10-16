@@ -38,8 +38,8 @@ type ComposeServiceView struct {
 }
 
 // ComposeProjectView 一个 compose 项目。
-// State：readable=面板能读到文件（可走 compose 更新通道）/ needsMount=需要挂载 /
-// noFile=label 未记录文件路径（老版本 compose 或手工创建的容器）
+// State：readable=面板能读到文件（可走 compose 更新通道）/ needsMount=路径对面板不可见需挂载 /
+// fileMissing=目录可见但文件不存在（多半已被移动/删除，挂载无用）/ noFile=label 未记录文件路径
 type ComposeProjectView struct {
 	Name          string               `json:"name"`
 	Services      []ComposeServiceView `json:"services"`
@@ -301,6 +301,12 @@ func BuildComposeProjectsView(svcCtx *svc.ServiceContext, selfContainerID string
 			// （优先非面板自身数据目录的候选）。
 			cands := translatePathCandidates(pv.ConfigFiles, sortedMounts)
 			readable := false
+			dirReachable := false // 文件所在目录可达（但文件不在）→ fileMissing
+			// 先查原路径的父目录：同路径挂载（如群晖 /volume2/docker → /volume2/docker）时
+			// 无需换算也没有换算候选，这是最常见的情形（issue #6 即为该场景）
+			if _, dErr := resolveDirWith(filepath.Dir(pv.ConfigFiles[0]), roots); dErr == nil {
+				dirReachable = true
+			}
 			for i := range cands {
 				if resolved2, e2 := resolveConfigFilesWith(cands[i].hostFiles, roots); e2 == nil {
 					resolved = resolved2
@@ -312,14 +318,26 @@ func BuildComposeProjectsView(svcCtx *svc.ServiceContext, selfContainerID string
 					readable = true
 					break
 				}
+				// 文件读不到：再看换算后目录是否可达——区分「文件被删/移走」与「路径没挂载」
+				if !dirReachable {
+					if _, dErr := resolveDirWith(filepath.Dir(cands[i].hostFiles[0]), roots); dErr == nil {
+						dirReachable = true
+					}
+				}
 			}
 			if !readable {
-				pv.State = "needsMount"
-				pv.MountHint = pickHintSource(cands, selfMountSources)
-				if pv.MountHint == "" {
-					pv.MountHint = pv.WorkingDir
+				if dirReachable {
+					// 目录在面板视角可见、文件却不在 → 多半被移动/删除，挂载引导帮不上忙，
+					// 给独立状态避免误导（issue #6：用户删了目录，面板却提示"需挂载"）
+					pv.State = "fileMissing"
+				} else {
+					pv.State = "needsMount"
+					pv.MountHint = pickHintSource(cands, selfMountSources)
 					if pv.MountHint == "" {
-						pv.MountHint = filepath.Dir(pv.ConfigFiles[0])
+						pv.MountHint = pv.WorkingDir
+						if pv.MountHint == "" {
+							pv.MountHint = filepath.Dir(pv.ConfigFiles[0])
+						}
 					}
 				}
 			}
@@ -473,6 +491,14 @@ func resolveOneDir(dir string, roots []string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// resolveDirWith 目录可达性解析（包装 resolveOneDir 为 error 形式，供 fileMissing 判定用）。
+func resolveDirWith(dir string, roots []string) (string, error) {
+	if resolved, ok := resolveOneDir(dir, roots); ok {
+		return resolved, nil
+	}
+	return "", fmt.Errorf("目录不可达: %s", dir)
 }
 
 // composeVarPattern 匹配 ${VAR...} 与 $VAR 两种插值写法（compose 语义）

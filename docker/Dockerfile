@@ -14,9 +14,9 @@ RUN apk add --no-cache tzdata docker-cli-compose \
     && chmod +x start.sh \
     && chmod +x dockhamster
 
-# 设置环境变量
-ENV secretKey="" \
-    DOCKER_HOST="unix:///var/run/docker.sock" \
+# 设置环境变量（不提供 secretKey 默认值：空密钥会让面板静默失去鉴权。
+# 缺少该变量时由程序启动校验明确拒绝并退出，见 dockhamster.go；部署时必须传入）
+ENV DOCKER_HOST="unix:///var/run/docker.sock" \
     BACKUP_DIR="/data/backups" \
     TZ="Asia/Shanghai"
 

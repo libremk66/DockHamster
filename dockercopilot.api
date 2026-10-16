@@ -170,6 +170,18 @@ service dockerCopilot {
 
 	@handler remove
 	delete /image/:id (RemoveImageReq) returns (Resp)
+
+	@handler intermediateStat
+	get /image/intermediateStat returns (Resp)
+
+	@handler pruneIntermediate
+	post /image/prune/intermediate returns (Resp)
+
+	@handler resourcesStat
+	get /resources/unused returns (Resp)
+
+	@handler resourcesPrune
+	post /resources/prune (PruneResourcesReq) returns (Resp)
 }
 
 @server(

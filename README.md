@@ -116,7 +116,7 @@ services:
     restart: always
     environment:
       - TZ=Asia/Shanghai
-      - secretKey=改成你自己的密钥   # 要求：大于8位且非纯数字
+      - secretKey='改成你自己的密钥'   # 要求：大于8位且非纯数字；建议加引号（纯数字不加引号会被 YAML 解析成数字而报错）
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/data
@@ -133,6 +133,8 @@ services:
 docker compose up -d
 # 浏览器打开 http://<你的主机>:12712 ，输入 secretKey 登录
 ```
+
+> ⚠️ **secretKey 是必须项**：这是面板唯一的登录凭据，请务必替换为高强度的自定义密钥（≥8 位且非纯数字）。**未配置或不合格时面板会拒绝启动**（日志会给出明确提示）——这是有意的保护：面板挂着 Docker socket，空密钥等于把整台机器的容器管理暴露出去。
 
 ## 五、Compose 项目支持
 

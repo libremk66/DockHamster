@@ -18,6 +18,7 @@ import (
 	migrate "github.com/libremk66/DockHamster/internal/handler/migrate"
 	progress "github.com/libremk66/DockHamster/internal/handler/progress"
 	projects "github.com/libremk66/DockHamster/internal/handler/projects"
+	resources "github.com/libremk66/DockHamster/internal/handler/resources"
 	selfupdate "github.com/libremk66/DockHamster/internal/handler/selfupdate"
 	snapshot "github.com/libremk66/DockHamster/internal/handler/snapshot"
 	version "github.com/libremk66/DockHamster/internal/handler/version"
@@ -113,6 +114,26 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Method:  http.MethodGet,
 				Path:    "/images",
 				Handler: image.ImagesListHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/image/intermediateStat",
+				Handler: image.IntermediateStatHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/image/prune/intermediate",
+				Handler: image.PruneIntermediateHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/resources/unused",
+				Handler: resources.StatHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/resources/prune",
+				Handler: resources.PruneHandler(serverCtx),
 			},
 		},
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),

@@ -65,7 +65,11 @@ func CollectAutoUpdateTargets(serviceContext *svc.ServiceContext, settings modul
 			continue
 		}
 		if !serviceContext.HubImageInfo.NeedUpdate(c.ImageID) {
-			continue
+			// DH_FORCE_UPDATE_TARGETS=1：仅测试/开发实例用——把白名单容器全部视作"有更新"，
+			// 用于验证队列/进度链路，不必真等远端有新版本。生产不设该变量，行为不变。
+			if os.Getenv("DH_FORCE_UPDATE_TARGETS") != "1" {
+				continue
+			}
 		}
 		targets = append(targets, AutoUpdateTarget{ID: c.ID, Name: name, PullRef: resolvePullRef(serviceContext, c.ImageID, c.Image)})
 	}
@@ -128,6 +132,12 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 	for i := range targets {
 		targets[i].TaskID = uuid.New().String()
 		active = append(active, module.ActiveTask{Name: targets[i].Name, TaskID: targets[i].TaskID})
+		// 同步登记到任务列表（ProgressStore）：让**排队中**的容器也显示在「任务」页，
+		// 而不是逐个执行到时才出现（此前「立即运行」触发多个任务时，任务页只见其一）
+		serviceContext.InitTask(targets[i].TaskID, targets[i].Name, "update", "autoupdate")
+		serviceContext.UpdateProgress(targets[i].TaskID, svc.TaskProgress{
+			TaskID: targets[i].TaskID, Percentage: 0, Message: "等待中", DetailMsg: "排队中，等待前序任务完成",
+		})
 	}
 	serviceContext.AutoUpdateState.SetActive(active)
 	defer serviceContext.AutoUpdateState.ClearActive()

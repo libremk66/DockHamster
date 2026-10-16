@@ -83,6 +83,11 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 	active := make([]module.ActiveTask, 0, len(tasks))
 	for _, t := range tasks {
 		active = append(active, module.ActiveTask{Name: t.Name, TaskID: t.TaskID})
+		// 同步登记到任务列表：排队中的容器也要显示在「任务」页（同自动更新，见 auto_update.go）
+		serviceContext.InitTask(t.TaskID, t.Name, "update", "group")
+		serviceContext.UpdateProgress(t.TaskID, svc.TaskProgress{
+			TaskID: t.TaskID, Percentage: 0, Message: "等待中", DetailMsg: "排队中，等待前序任务完成",
+		})
 	}
 	serviceContext.AutoUpdateState.SetActive(active)
 

@@ -12,6 +12,7 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
 	github.com/zeromicro/go-zero v1.8.2
 	github.com/zeromicro/x v0.0.0-20240408115609-8224c482b07e
 	sigs.k8s.io/yaml v1.3.0
@@ -51,7 +52,6 @@ require (
 	github.com/prometheus/procfs v0.16.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.47.0 // indirect
 	go.opentelemetry.io/otel v1.35.0 // indirect
