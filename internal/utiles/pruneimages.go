@@ -3,6 +3,7 @@ package utiles
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -52,7 +53,9 @@ func pruneCandidates(images []image.Summary, inUse map[string]bool) (candidates 
 // 返回累计删除数、剩余被依赖数、实际轮数。
 func PruneDanglingImages(serviceContext *svc.ServiceContext) (PruneDanglingResult, error) {
 	result := PruneDanglingResult{}
-	ctx := context.Background()
+	// 与前端 300s 超时对齐；daemon/网络挂住时必须有 deadline，避免后台无限跑。
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 	serviceContext.DockerClient.NegotiateAPIVersion(ctx)
 
 	for round := 0; round < pruneMaxRounds; round++ {
