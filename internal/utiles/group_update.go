@@ -92,6 +92,17 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 	serviceContext.AutoUpdateState.SetActive(active)
 
 	go func() {
+		groupTaskIDs := make([]string, 0, len(tasks))
+		for _, t := range tasks {
+			groupTaskIDs = append(groupTaskIDs, t.TaskID)
+		}
+		// panic 会从 goroutine 逃逸并退出进程；这里兜底并给未完成任务落终态。
+		defer func() {
+			if r := recover(); r != nil {
+				logx.Errorf("整组更新 panic: %v", r)
+				setTasksFailed(serviceContext, groupTaskIDs, "整组更新异常中断", "内部错误，请查看面板日志")
+			}
+		}()
 		defer serviceContext.AutoUpdateState.Finish()
 		defer serviceContext.AutoUpdateState.ClearActive()
 		start := time.Now()
@@ -102,11 +113,7 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 			Failed:  []module.AutoRunFailure{},
 		}
 		logx.Infof("整组更新：拉取 %s（%d 个容器共用）", pullRef, len(tasks))
-		// 组内每台的 taskID 都带上：拉取进度对每一台的行都可见
-		groupTaskIDs := make([]string, 0, len(tasks))
-		for _, t := range tasks {
-			groupTaskIDs = append(groupTaskIDs, t.TaskID)
-		}
+		// 组内每台的 taskID 都带上：拉取进度对每一台的行都可见（groupTaskIDs 在 goroutine 开头已构建）
 		if err := PullImageByRefForTasks(serviceContext, pullRef, groupTaskIDs); err != nil {
 			logx.Errorf("整组更新：拉取 %s 失败：%v", pullRef, err)
 			// 拉取流程已把失败写进各 taskID；这里再兜一层，确保整组都落终态

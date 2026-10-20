@@ -82,6 +82,15 @@ func CollectAutoUpdateTargets(serviceContext *svc.ServiceContext, settings modul
 // 同一镜像被多个容器共用时：只拉取一次，再逐个容器重建；
 // 旧镜像由 CleanupOldImage 的引用计数保护，最后一个使用者更新完成后才清理。
 func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
+	// 手动触发走 go RunAutoUpdate；这里必须自己 recover，否则 panic 会带崩整个面板进程。
+	// 记录已登记的 taskID，panic 时把没落终态的任务统一标失败，避免永远停在「等待中」。
+	var taskIDs []string
+	defer func() {
+		if r := recover(); r != nil {
+			logx.Errorf("自动更新 panic: %v", r)
+			setTasksFailed(serviceContext, taskIDs, "自动更新异常中断", "内部错误，请查看面板日志")
+		}
+	}()
 	settings := serviceContext.AutoUpdate.Get()
 	whitelist := parseNameList(settings.Containers)
 	if len(whitelist) == 0 {
@@ -131,6 +140,7 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 	active := make([]module.ActiveTask, 0, len(targets))
 	for i := range targets {
 		targets[i].TaskID = uuid.New().String()
+		taskIDs = append(taskIDs, targets[i].TaskID)
 		active = append(active, module.ActiveTask{Name: targets[i].Name, TaskID: targets[i].TaskID})
 		// 同步登记到任务列表（ProgressStore）：让**排队中**的容器也显示在「任务」页，
 		// 而不是逐个执行到时才出现（此前「立即运行」触发多个任务时，任务页只见其一）

@@ -187,6 +187,8 @@ type TaskView struct {
 
 // ListTasks 列出全部任务（进行中在前按开始时间倒序；已完成按更新时间倒序）
 func (ctx *ServiceContext) ListTasks() []TaskView {
+	// 已完成任务保留 2 小时；顺手清掉更旧的记录，避免长期运行时 ProgressStore 缓涨。
+	ctx.PurgeFinishedProgress(2 * time.Hour)
 	ctx.mu.Lock()
 	defer ctx.mu.Unlock()
 	const layout = "2006-01-02 15:04:05"
