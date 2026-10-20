@@ -109,6 +109,8 @@ func RunGroupUpdate(serviceContext *svc.ServiceContext, containerID string) ([]G
 		}
 		if err := PullImageByRefForTasks(serviceContext, pullRef, groupTaskIDs); err != nil {
 			logx.Errorf("整组更新：拉取 %s 失败：%v", pullRef, err)
+			// 拉取流程已把失败写进各 taskID；这里再兜一层，确保整组都落终态
+			setTasksFailed(serviceContext, groupTaskIDs, "拉取镜像失败", FriendlyDaemonError(err).Error())
 			result.Failed = append(result.Failed, module.AutoRunFailure{Name: pullRef, Error: "拉取失败: " + oneLine(FriendlyDaemonError(err).Error())})
 			result.DurationSec = time.Since(start).Seconds()
 			serviceContext.AutoUpdateState.AddRun(result)

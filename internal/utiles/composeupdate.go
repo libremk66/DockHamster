@@ -186,7 +186,7 @@ func UpdateContainerViaCompose(serviceContext *svc.ServiceContext, meta ComposeM
 	if !meta.IsManaged {
 		return fmt.Errorf("容器不属于任何 compose 项目")
 	}
-	setMsg := func(pct int, msg string, done bool) {
+	setMsg := func(pct int, msg string, done, failed bool) {
 		serviceContext.UpdateProgress(taskID, svc.TaskProgress{
 			TaskID:     taskID,
 			Percentage: pct,
@@ -194,38 +194,46 @@ func UpdateContainerViaCompose(serviceContext *svc.ServiceContext, meta ComposeM
 			Message:    msg,
 			DetailMsg:  msg,
 			IsDone:     done,
+			Failed:     failed,
 		})
 	}
 	fail := func(pct int, err error) error {
-		setMsg(pct, "操作失败（compose）："+err.Error(), true)
+		if errors.Is(err, ErrComposeUnavailable) {
+			// 环境不可用会由调用方回退 API 重建，不算本次更新失败：
+			// 不能落终态，否则历史里会多一条误导性的失败记录（回退成功也留着红星）
+			setMsg(pct, "compose 通道不可用，回退 API 重建："+err.Error(), false, false)
+			return err
+		}
+		// 失败必须带 Failed 标记：只置 IsDone 会被前端当成"完成"（历史里也显示成功）
+		setMsg(pct, "操作失败（compose）："+err.Error(), true, true)
 		return err
 	}
 	// 重建期间容器会短暂消失，让守护模块静默（与 API 通道一致）
 	NoteMaintenance(serviceContext, meta.Service, 15*time.Minute)
 
 	if skipPull {
-		setMsg(40, "跳过拉取，按 compose 配置重建", false)
+		setMsg(40, "跳过拉取，按 compose 配置重建", false, false)
 	} else {
-		setMsg(5, "compose 容器，正在拉取新镜像", false)
+		setMsg(5, "compose 容器，正在拉取新镜像", false, false)
 		if imageNameAndTag != "" {
 			if err := PullImageByRefForTasks(serviceContext, imageNameAndTag, []string{taskID}); err != nil {
 				return fail(25, fmt.Errorf("拉取镜像失败: %w", err))
 			}
 		}
 	}
-	setMsg(60, fmt.Sprintf("正在 compose 重建 %s", meta.UpdateRef()), false)
+	setMsg(60, fmt.Sprintf("正在 compose 重建 %s", meta.UpdateRef()), false, false)
 	if err := composeUpService(serviceContext, meta, true); err != nil {
 		return fail(80, err)
 	}
 	newID, err := findComposeContainerID(serviceContext, meta)
 	if err != nil {
 		// 容器没找到不一定是失败（可能 service 配置了 profiles 未启动），交由上层展示
-		setMsg(100, "compose 重建完成（未能定位新容器做健康校验）", true)
+		setMsg(100, "compose 重建完成（未能定位新容器做健康校验）", true, false)
 		return nil
 	}
-	setMsg(85, "正在校验新容器运行状态", false)
+	setMsg(85, "正在校验新容器运行状态", false, false)
 	healthy, reason := WaitContainerHealthy(serviceContext, newID, func(msg string) {
-		setMsg(88, msg, false)
+		setMsg(88, msg, false, false)
 	})
 	if !healthy {
 		return fail(90, fmt.Errorf("新容器健康校验失败: %s", reason))
@@ -234,6 +242,6 @@ func UpdateContainerViaCompose(serviceContext *svc.ServiceContext, meta ComposeM
 	if skipPull {
 		action = "重建"
 	}
-	setMsg(100, action+"成功（compose）", true)
+	setMsg(100, action+"成功（compose）", true, false)
 	return nil
 }

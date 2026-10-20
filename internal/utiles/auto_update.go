@@ -146,8 +146,11 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 	groups := make(map[string][]AutoUpdateTarget)
 	for _, t := range targets {
 		if t.PullRef == "" {
-			// 镜像无标签（悬空/本地构建）：无法确定拉取目标，明确跳过并说明
+			// 镜像无标签（悬空/本地构建）：无法确定拉取目标，明确跳过并说明。
+			// 任务行也必须落终态，否则会永远停在「等待中」。
 			logx.Errorf("自动更新：容器 %s 的镜像无有效标签，跳过", t.Name)
+			setTasksFailed(serviceContext, []string{t.TaskID}, "无法更新",
+				"镜像无有效标签（悬空/本地构建），无法自动更新")
 			result.Failed = append(result.Failed, module.AutoRunFailure{Name: t.Name, Error: "镜像无有效标签（悬空/本地构建），无法自动更新"})
 			serviceContext.AutoUpdateState.SetContainer(t.Name, false, "镜像无有效标签，跳过")
 			continue
@@ -164,7 +167,8 @@ func RunAutoUpdate(serviceContext *svc.ServiceContext, trigger string) {
 		logx.Infof("自动更新：拉取 %s（%d 个容器共用）", pullRef, len(group))
 		if err := PullImageByRefForTasks(serviceContext, pullRef, groupTaskIDs); err != nil {
 			logx.Errorf("自动更新：拉取 %s 失败，跳过本组：%v", pullRef, err)
-			// 失败进度已由拉取流程写进各 taskID（含 Failed 标记，UI 显示红色）
+			// 拉取流程已把失败写进各 taskID；这里再兜一层，确保整组都落终态
+			setTasksFailed(serviceContext, groupTaskIDs, "拉取镜像失败", FriendlyDaemonError(err).Error())
 			for _, t := range group {
 				result.Failed = append(result.Failed, module.AutoRunFailure{Name: t.Name, Error: "拉取失败: " + oneLine(FriendlyDaemonError(err).Error())})
 				serviceContext.AutoUpdateState.SetContainer(t.Name, false, "拉取失败: "+oneLine(FriendlyDaemonError(err).Error()))

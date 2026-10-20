@@ -31,6 +31,33 @@ func setTaskMessage(svcCtx *svc.ServiceContext, taskIDs []string, msg string) {
 	}
 }
 
+// setTasksFailed 把一组任务落为"失败完成"终态。
+// 「任务」页的进行中列表只按 IsDone 过滤，任何提前退出的路径都必须落终态，
+// 否则排队中的行会永远停在「等待中，等待前序任务完成」。
+// 已经处于失败态的任务保留原有（更具体的）错误信息，不覆盖。
+func setTasksFailed(svcCtx *svc.ServiceContext, taskIDs []string, msg, detail string) {
+	for _, taskID := range taskIDs {
+		if taskID == "" {
+			continue
+		}
+		p, ok := svcCtx.GetProgress(taskID)
+		if !ok {
+			p = svc.TaskProgress{TaskID: taskID}
+		}
+		if p.IsDone && p.Failed {
+			continue
+		}
+		p.TaskID = taskID
+		if msg != "" {
+			p.Message = msg
+		}
+		p.DetailMsg = detail
+		p.IsDone = true
+		p.Failed = true
+		svcCtx.UpdateProgress(taskID, p)
+	}
+}
+
 // consumePullStream 消费拉取进度流但不写进度（无 taskID 的场景）
 func consumePullStream(reader io.ReadCloser) error {
 	defer func() { _ = reader.Close() }()
@@ -104,7 +131,14 @@ func PullImageForUpdate(svcCtx *svc.ServiceContext, taskID, imageRef string) err
 // PullImageForTasks 拉取入口（多任务版）：配置了默认加速源且是 Docker Hub 镜像时
 // 先走加速源，失败自动回退直连。taskIDs 为空时拉取但不写进度（纯预拉场景）。
 // 批量更新把组内所有容器的 taskID 传进来 —— 同镜像只拉一次、进度对每台都可见。
-func PullImageForTasks(svcCtx *svc.ServiceContext, taskIDs []string, imageRef string) error {
+// 任何失败出口都由 defer 统一落失败终态：ImagePull 在拿到进度流之前就失败
+// （TLS 握手超时 / 限流 / 仓库不可达）时，此前不会写任何进度，排队任务会永远停在「等待中」。
+func PullImageForTasks(svcCtx *svc.ServiceContext, taskIDs []string, imageRef string) (err error) {
+	defer func() {
+		if err != nil {
+			setTasksFailed(svcCtx, taskIDs, "拉取镜像失败", FriendlyDaemonError(err).Error())
+		}
+	}()
 	if source := svcCtx.Accelerator.UpdateSource(); source != "" {
 		if _, err := MirrorRefFor(source, imageRef); err == nil {
 			if perr := pullImageViaMirrorFor(svcCtx, taskIDs, source, imageRef); perr == nil {

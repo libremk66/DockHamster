@@ -30,17 +30,29 @@ func Launch(svcCtx *svc.ServiceContext, selfID, name, imageRef, taskID string) e
 			IsDone:     done,
 		})
 	}
+	// 失败终态必须带 Failed 标记：只置 IsDone 会被前端当成"完成"（历史里也显示成功）
+	failProgress := func(msg string) {
+		svcCtx.UpdateProgress(taskID, svc.TaskProgress{
+			TaskID:     taskID,
+			Percentage: 100,
+			Name:       name,
+			Message:    msg,
+			DetailMsg:  msg,
+			IsDone:     true,
+			Failed:     true,
+		})
+	}
 
 	svcCtx.InitTask(taskID, imageRef, "selfupdate", "selfupdate")
 	progress(5, "正在拉取新镜像 "+imageRef, false)
 	if err := utiles.PullImageForUpdate(svcCtx, taskID, imageRef); err != nil {
-		progress(100, "拉取镜像失败: "+err.Error(), true)
+		failProgress("拉取镜像失败: " + err.Error())
 		return err
 	}
 
 	selfIns, err := svcCtx.DockerClient.ContainerInspect(ctx, selfID)
 	if err != nil {
-		progress(100, "获取自身容器信息失败: "+err.Error(), true)
+		failProgress("获取自身容器信息失败: " + err.Error())
 		return err
 	}
 
@@ -85,12 +97,12 @@ func Launch(svcCtx *svc.ServiceContext, selfID, name, imageRef, taskID string) e
 		Privileged: selfIns.HostConfig != nil && selfIns.HostConfig.Privileged,
 	}
 	if _, err := svcCtx.DockerClient.ContainerCreate(ctx, cfg, hostCfg, nil, nil, UpdaterName); err != nil {
-		progress(100, "创建接力更新容器失败: "+err.Error(), true)
+		failProgress("创建接力更新容器失败: " + err.Error())
 		return err
 	}
 	if err := svcCtx.DockerClient.ContainerStart(ctx, UpdaterName, container.StartOptions{}); err != nil {
 		_ = svcCtx.DockerClient.ContainerRemove(ctx, UpdaterName, container.RemoveOptions{Force: true})
-		progress(100, "启动接力更新容器失败: "+err.Error(), true)
+		failProgress("启动接力更新容器失败: " + err.Error())
 		return err
 	}
 
