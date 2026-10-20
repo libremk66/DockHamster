@@ -84,6 +84,12 @@ type RemoveImageReq {
 	Force bool `form:"force,default=false"`
 }
 
+type PruneResourcesReq {
+	Volumes        bool `form:"volumes,default=false" json:"volumes,optional"`
+	ProjectVolumes bool `form:"projectVolumes,default=false" json:"projectVolumes,optional"`
+	Networks       bool `form:"networks,default=false" json:"networks,optional"`
+}
+
 type ContainerUpdateReq {
 	IdReq
 	ImageNameAndTag string `form:"imageNameAndTag"`

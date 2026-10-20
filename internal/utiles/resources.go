@@ -2,6 +2,7 @@ package utiles
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -247,6 +248,18 @@ func volumeAgeOK(createdAt string, untilHours int) bool {
 	return time.Since(t) >= time.Duration(untilHours)*time.Hour
 }
 
+// volumeAgeSkipReason 返回卷不满足时间窗时的跳过原因；空字符串表示可以删除。
+// 时间解析失败或时间窗配置异常时一律不删（保守处理）。
+func volumeAgeSkipReason(createdAt string, untilHours int) string {
+	if untilHours <= 0 {
+		return "清理时间窗配置异常（跳过）"
+	}
+	if !volumeAgeOK(createdAt, untilHours) {
+		return fmt.Sprintf("创建时间不足 %d 小时或无法解析（跳过）", untilHours)
+	}
+	return ""
+}
+
 // PruneResources 清理未使用的卷与网络。
 //   - volumes=true：清匿名卷（无引用 + 过时间窗 + 二次校验仍无引用）
 //   - projectVolumes=true：额外清"项目已不存在"的有名卷（UI 需显式确认）
@@ -286,6 +299,11 @@ func PruneResources(svcCtx *svc.ServiceContext, pruneVolumes, pruneProjectVolume
 				failed[v.Name] = "已被容器挂载（跳过）"
 				continue
 			}
+			// 匿名卷同样受 24h 时间窗保护：避免删掉刚由容器重建产生、仍可能被外部引用的卷。
+			if reason := volumeAgeSkipReason(v.CreatedAt, stat.UntilHours); reason != "" {
+				failed[v.Name] = reason
+				continue
+			}
 			if err := svcCtx.DockerClient.VolumeRemove(ctx, v.Name, false); err != nil {
 				failed[v.Name] = FriendlyDaemonError(err).Error()
 				continue
@@ -299,8 +317,8 @@ func PruneResources(svcCtx *svc.ServiceContext, pruneVolumes, pruneProjectVolume
 				failed[v.Name] = "已被容器挂载（跳过）"
 				continue
 			}
-			if !volumeAgeOK(v.CreatedAt, stat.UntilHours) {
-				failed[v.Name] = "创建时间不足 24 小时（跳过）"
+			if reason := volumeAgeSkipReason(v.CreatedAt, stat.UntilHours); reason != "" {
+				failed[v.Name] = reason
 				continue
 			}
 			if err := svcCtx.DockerClient.VolumeRemove(ctx, v.Name, false); err != nil {
