@@ -26,12 +26,18 @@ func RegisterCrons(svcCtx *svc.ServiceContext) error {
 		svcCtx.AutoUpdateCronID = 0
 	}
 	id, err := svcCtx.CronEngine.AddFunc(settings.Cron, func() {
-		if !svcCtx.AutoUpdate.Get().Enabled {
-			return
-		}
-		utiles.RunAutoUpdate(svcCtx, "auto")
-		// 本轮结束后重挂"更新前提醒"定时器（对准下一次计划时间）
-		utiles.ScheduleBeforeUpdateNotice(svcCtx)
+		runCronSafe("自动更新", func() {
+			// 兜底复位：RunAutoUpdate 自身有 defer，但 panic 路径仍要保证状态不残留
+			svcCtx.AutoUpdateState.Finish()
+			svcCtx.AutoUpdateState.ClearActive()
+		}, func() {
+			if !svcCtx.AutoUpdate.Get().Enabled {
+				return
+			}
+			utiles.RunAutoUpdate(svcCtx, "auto")
+			// 本轮结束后重挂"更新前提醒"定时器（对准下一次计划时间）
+			utiles.ScheduleBeforeUpdateNotice(svcCtx)
+		})
 	})
 	if err != nil {
 		return fmt.Errorf("自动更新计划无效: %w", err)
@@ -44,9 +50,11 @@ func RegisterCrons(svcCtx *svc.ServiceContext) error {
 		svcCtx.CheckCronID = 0
 	}
 	id2, err := svcCtx.CronEngine.AddFunc(settings.CheckCron, func() {
-		if _, _, cerr := utiles.CheckAllImageUpdates(svcCtx, "cron"); cerr != nil {
-			logx.Errorf("定时检查更新失败: %v", cerr)
-		}
+		runCronSafe("更新检查", nil, func() {
+			if _, _, cerr := utiles.CheckAllImageUpdates(svcCtx, "cron"); cerr != nil {
+				logx.Errorf("定时检查更新失败: %v", cerr)
+			}
+		})
 	})
 	if err != nil {
 		return fmt.Errorf("检查更新计划无效: %w", err)
@@ -56,6 +64,21 @@ func RegisterCrons(svcCtx *svc.ServiceContext) error {
 	// ③ 更新前提醒（提前量）：重算并重挂（启动时、改设置后都会走到这里）
 	utiles.ScheduleBeforeUpdateNotice(svcCtx)
 	return nil
+}
+
+// runCronSafe 在 cron 回调外围捕获 panic。
+// robfig/cron 的 New() 默认 chain 为空，不带 Recover；panic 会从 goroutine 逃逸并退出整个进程。
+// onPanic 用于复位可能残留的运行状态（可重复调用）。
+func runCronSafe(name string, onPanic func(), fn func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			logx.Errorf("定时任务 %s panic: %v", name, r)
+			if onPanic != nil {
+				onPanic()
+			}
+		}
+	}()
+	fn()
 }
 
 // ValidateCron 校验 cron 表达式（标准 5 段）
