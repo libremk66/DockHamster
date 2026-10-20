@@ -420,6 +420,7 @@ func decodePullResp(reader io.ReadCloser, ctx *svc.ServiceContext, taskIDs []str
 	defer func() { _ = reader.Close() }()
 	decoder := json.NewDecoder(reader)
 	pp := newPullProgress()
+	sawSuccess := false
 	// 承接外层已设置的阶段文案（如"正在拉取新镜像"）
 	stageMsg := "正在拉取镜像"
 	for _, id := range taskIDs {
@@ -456,6 +457,9 @@ func decodePullResp(reader io.ReadCloser, ctx *svc.ServiceContext, taskIDs []str
 		var msg dockerMsgType.JSONMessage
 		if err = decoder.Decode(&msg); err != nil {
 			if err == io.EOF {
+				if !sawSuccess {
+					return fail("拉取流提前结束（未收到成功确认）")
+				}
 				return nil
 			}
 			logx.Errorf("Failed to decode pull image response: %s", err)
@@ -464,6 +468,9 @@ func decodePullResp(reader io.ReadCloser, ctx *svc.ServiceContext, taskIDs []str
 		if msg.Error != nil {
 			logx.Errorf("Error: %s", msg.Error)
 			return fail(msg.Error.Error())
+		}
+		if pullMessageSucceeded(msg) {
+			sawSuccess = true
 		}
 		pct, detail := pp.feed(msg)
 		if detail == "" {

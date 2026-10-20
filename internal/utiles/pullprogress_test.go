@@ -83,11 +83,12 @@ func TestDecodePullRespFanOut(t *testing.T) {
 	}
 	ids := []string{"t1", "t2"}
 
-	// 成功流：两条下载消息 + 完成
+	// 成功流：两条下载消息 + 完成 + 最终成功确认（真实 Docker 拉取会带最后一条）
 	stream := strings.Join([]string{
 		`{"id":"l1","status":"Downloading","progressDetail":{"current":50,"total":100}}`,
 		`{"id":"l1","status":"Downloading","progressDetail":{"current":100,"total":100}}`,
 		`{"id":"l1","status":"Pull complete"}`,
+		`{"status":"Status: Downloaded newer image for example:latest"}`,
 	}, "\n")
 	ctx := newCtx()
 	if err := decodePullResp(io.NopCloser(strings.NewReader(stream)), ctx, ids); err != nil {

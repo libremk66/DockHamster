@@ -3,13 +3,30 @@ package utiles
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types/image"
 	dockerMsgType "github.com/docker/docker/pkg/jsonmessage"
 	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/zeromicro/go-zero/core/logx"
 )
+
+// pullTimeout 单次拉取（含读进度流）的上限。TLS 握手/流中途挂住时必须有 deadline，
+// 否则 defer 的失败终态永远执行不到，AutoUpdateState 会一直被占用。
+const pullTimeout = 30 * time.Minute
+
+// pullMessageSucceeded 判断 Docker 拉取流里的成功确认。
+// EOF 本身不代表成功——连接中途断开也可能 EOF；必须有 aux 或最终状态。
+func pullMessageSucceeded(msg dockerMsgType.JSONMessage) bool {
+	if msg.Aux != nil && len(*msg.Aux) > 0 {
+		return true
+	}
+	s := msg.Status
+	return strings.Contains(s, "Downloaded newer image") || strings.Contains(s, "Image is up to date")
+}
 
 // setTaskMessage 覆写任务进度消息（taskIDs 为空/全空时跳过）。
 // 组内多台共用一次拉取时传多个 taskID：每台的行都能看到同一进度。
@@ -62,16 +79,23 @@ func setTasksFailed(svcCtx *svc.ServiceContext, taskIDs []string, msg, detail st
 func consumePullStream(reader io.ReadCloser) error {
 	defer func() { _ = reader.Close() }()
 	decoder := json.NewDecoder(reader)
+	sawSuccess := false
 	for {
 		var msg dockerMsgType.JSONMessage
 		if err := decoder.Decode(&msg); err != nil {
 			if err == io.EOF {
+				if !sawSuccess {
+					return fmt.Errorf("拉取流提前结束（未收到成功确认）")
+				}
 				return nil
 			}
 			return err
 		}
 		if msg.Error != nil {
 			return msg.Error
+		}
+		if pullMessageSucceeded(msg) {
+			sawSuccess = true
 		}
 	}
 }
@@ -88,7 +112,8 @@ func PullImageViaMirror(svcCtx *svc.ServiceContext, taskID, source, imageRef str
 
 // pullImageViaMirrorFor 多任务版：进度同步写给 taskIDs 里的每个任务
 func pullImageViaMirrorFor(svcCtx *svc.ServiceContext, taskIDs []string, source, imageRef string) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), pullTimeout)
+	defer cancel()
 	mirrorRef, err := MirrorRefFor(source, imageRef)
 	if err != nil {
 		return err
@@ -149,7 +174,9 @@ func PullImageForTasks(svcCtx *svc.ServiceContext, taskIDs []string, imageRef st
 			}
 		}
 	}
-	reader, err := svcCtx.DockerClient.ImagePull(context.Background(), imageRef, image.PullOptions{})
+	ctx, cancel := context.WithTimeout(context.Background(), pullTimeout)
+	defer cancel()
+	reader, err := svcCtx.DockerClient.ImagePull(ctx, imageRef, image.PullOptions{})
 	if err != nil {
 		return FriendlyPullError(imageRef, err)
 	}
