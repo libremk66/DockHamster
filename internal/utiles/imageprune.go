@@ -80,12 +80,18 @@ func CollectIntermediateImages(svcCtx *svc.ServiceContext) (*ImageIntermediateSt
 	}
 
 	stat := &ImageIntermediateStat{}
+	untilHours := IntermediateUntilHours()
 	for _, img := range images {
 		if len(img.RepoTags) > 0 {
 			continue
 		}
 		if inUse[img.ID] {
 			stat.InUse++
+			continue
+		}
+		// 统计口径与 PruneIntermediateImages 的 24h 时间窗保持一致，
+		// 否则界面会显示“可清理 N 个”，实际点下去一个都不删。
+		if !intermediateAgeEligible(img.Created, untilHours, time.Now()) {
 			continue
 		}
 		stat.Count++
@@ -97,6 +103,15 @@ func CollectIntermediateImages(svcCtx *svc.ServiceContext) (*ImageIntermediateSt
 	intermediateStatCacheExpires = time.Now().Add(imageParentCacheTTL)
 	intermediateStatCacheMu.Unlock()
 	return stat, nil
+}
+
+// intermediateAgeEligible 判断无 Tag 镜像是否已超过清理时间窗。
+// untilHours<=0 时视为不过滤（测试/立即清理）。
+func intermediateAgeEligible(createdUnix int64, untilHours int, now time.Time) bool {
+	if untilHours <= 0 {
+		return true
+	}
+	return createdUnix <= now.Add(-time.Duration(untilHours)*time.Hour).Unix()
 }
 
 // PruneIntermediateImages 清理无标签的构建中间层。

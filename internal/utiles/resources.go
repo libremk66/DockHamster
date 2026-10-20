@@ -93,7 +93,7 @@ func collectComposeProjects(containers []dockertypes.Container) map[string]bool 
 // protectedNetwork 系统网络白名单（永不建议清理）。
 func protectedNetwork(name string) bool {
 	switch name {
-	case "bridge", "host", "none", "docker0", "ingress":
+	case "bridge", "host", "none", "docker0", "docker_gwbridge", "ingress":
 		return true
 	}
 	return false
