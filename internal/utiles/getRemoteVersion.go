@@ -1,6 +1,7 @@
 package utiles
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -14,12 +15,20 @@ import (
 
 // 远端版本查询的缓存：网络抖动/GitHub 不可达时不至于让界面丢信息，也避免每次都打网络
 var (
-	remoteVersionCache   string
-	remoteVersionCacheAt time.Time
-	remoteVersionMu      sync.Mutex
+	remoteVersionCache    string
+	remoteVersionCacheAt  time.Time
+	remoteVersionFailedAt time.Time
+	remoteVersionMu       sync.Mutex
+
+	// 单飞：同一时刻只允许一次外网检查，其余请求等结果
+	remoteVersionFetching  bool
+	remoteVersionFetchDone chan struct{}
 )
 
 const remoteVersionCacheTTL = 10 * time.Minute
+
+// 失败冷却：外网源刚失败过时，短时间内直接返回旧值/失败，避免每次进页面都等满 3×6 秒超时
+const remoteVersionFailureCooldown = 60 * time.Second
 
 // 版本检测使用多个源，按"直连优先 + 自动兜底"顺序尝试：
 // 海外/可翻墙环境走 GitHub；国内直连不通时自动退到 jsDelivr CDN 或公共镜像。
@@ -65,7 +74,44 @@ func GetRemoteVersion() (remoteVersion string, err error) {
 		remoteVersionMu.Unlock()
 		return cached, nil
 	}
+	// 失败冷却：刚失败过就直接给旧值，不再阻塞页面
+	if !remoteVersionFailedAt.IsZero() && time.Since(remoteVersionFailedAt) < remoteVersionFailureCooldown {
+		cached := remoteVersionCache
+		remoteVersionMu.Unlock()
+		if cached != "" {
+			return cached, nil
+		}
+		return "0.0.0", fmt.Errorf("远端版本查询失败（冷却中）")
+	}
+	// 单飞：并发请求共用一次外网检查
+	if remoteVersionFetching {
+		done := remoteVersionFetchDone
+		remoteVersionMu.Unlock()
+		<-done
+		remoteVersionMu.Lock()
+		cached := remoteVersionCache
+		failed := !remoteVersionFailedAt.IsZero()
+		remoteVersionMu.Unlock()
+		if cached != "" {
+			return cached, nil
+		}
+		if failed {
+			return "0.0.0", fmt.Errorf("远端版本查询失败")
+		}
+		return "0.0.0", nil
+	}
+	remoteVersionFetching = true
+	fetchDone := make(chan struct{})
+	remoteVersionFetchDone = fetchDone
 	remoteVersionMu.Unlock()
+
+	defer func() {
+		remoteVersionMu.Lock()
+		remoteVersionFetching = false
+		remoteVersionFetchDone = nil
+		close(fetchDone)
+		remoteVersionMu.Unlock()
+	}()
 
 	githubProxy := os.Getenv("githubProxy")
 	if githubProxy != "" {
@@ -87,8 +133,9 @@ func GetRemoteVersion() (remoteVersion string, err error) {
 	err = lastErr
 fetched:
 	if err != nil {
-		// 失败时若有旧缓存，宁可返回旧值（附错误日志），也不让前端拿不到
+		// 失败时若有旧缓存，宁可返回旧值（附错误日志），也不让前端拿不到；同时记下失败时间做短冷却
 		remoteVersionMu.Lock()
+		remoteVersionFailedAt = time.Now()
 		cached := remoteVersionCache
 		remoteVersionMu.Unlock()
 		if cached != "" {
@@ -100,6 +147,7 @@ fetched:
 	remoteVersionMu.Lock()
 	remoteVersionCache = remoteVersion
 	remoteVersionCacheAt = time.Now()
+	remoteVersionFailedAt = time.Time{}
 	remoteVersionMu.Unlock()
 
 	localVersion := config.Version

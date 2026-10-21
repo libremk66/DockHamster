@@ -21,6 +21,7 @@ const ownImageRepo = "libremk66/dockhamster"
 
 var (
 	ownImageCheckedAt time.Time
+	ownImageFailedAt  time.Time
 	ownImageResult    bool
 	ownImageDigest    string
 	ownImageMu        sync.Mutex
@@ -28,10 +29,18 @@ var (
 
 const ownImageCacheTTL = 10 * time.Minute
 
+// 失败冷却：digest 查询刚失败过时短时间不再重试，避免每次进页面都等网络超时
+const ownImageFailureCooldown = 2 * time.Minute
+
 // OwnImageHasUpdate 检查 libremk66/dockhamster:latest 是否有更新（远端 digest ≠ 本地 digest）
 func OwnImageHasUpdate(serviceContext *svc.ServiceContext) (bool, string) {
 	ownImageMu.Lock()
 	if !ownImageCheckedAt.IsZero() && time.Since(ownImageCheckedAt) < ownImageCacheTTL {
+		r, d := ownImageResult, ownImageDigest
+		ownImageMu.Unlock()
+		return r, d
+	}
+	if !ownImageFailedAt.IsZero() && time.Since(ownImageFailedAt) < ownImageFailureCooldown {
 		r, d := ownImageResult, ownImageDigest
 		ownImageMu.Unlock()
 		return r, d
@@ -44,6 +53,9 @@ func OwnImageHasUpdate(serviceContext *svc.ServiceContext) (bool, string) {
 		ownImageResult = needUpdate
 		ownImageDigest = remoteDigest
 		ownImageCheckedAt = time.Now()
+		ownImageFailedAt = time.Time{}
+	} else {
+		ownImageFailedAt = time.Now()
 	}
 	ownImageMu.Unlock()
 	return needUpdate, remoteDigest
