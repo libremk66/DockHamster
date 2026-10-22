@@ -9,6 +9,7 @@ import (
 	"github.com/libremk66/DockHamster/internal/utiles"
 	"github.com/zeromicro/go-zero/core/logx"
 	"os"
+	"strings"
 )
 
 type UpdateLogic struct {
@@ -72,8 +73,15 @@ func (l *UpdateLogic) Update(req *types.ContainerUpdateReq) (resp *types.Resp, e
 			Trigger:         "container",
 		}
 		err := utiles.UpdateContainer(l.svcCtx, req.Id, req.ContainerName, imageNameAndTag, opts, taskID)
+		// 手动更新也刷新「上次更新结果」：成功会覆盖之前的失败标记；
+		// 失败则写入新的失败标记（用户可在容器列表点 × 清除）。
+		msg := "更新成功"
 		if err != nil {
+			msg = "更新失败：" + strings.ReplaceAll(err.Error(), "\n", " ")
 			l.Errorf("Error in UpdateContainer: %v", err)
+		}
+		if l.svcCtx.AutoUpdateState != nil {
+			l.svcCtx.AutoUpdateState.SetContainer(req.ContainerName, err == nil, msg)
 		}
 	}()
 	resp.Code = 200

@@ -34,6 +34,39 @@ func TestAutoUpdateStatePersist(t *testing.T) {
 	}
 }
 
+// 用户点「清除」后，失败标记应删除并持久化（重启后不回来）
+func TestAutoUpdateStateClearContainer(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "h.json")
+	t.Setenv("AutoUpdateHistoryFile", path)
+	s := NewAutoUpdateState()
+	s.SetContainer("alpha", false, "拉取失败")
+	s.SetContainer("beta", true, "更新成功")
+
+	if !s.ClearContainer("alpha") {
+		t.Fatal("alpha 标记应被清除")
+	}
+	if s.ClearContainer("alpha") {
+		t.Fatal("重复清除应返回 false")
+	}
+	_, _, last, _ := s.Snapshot()
+	if _, ok := last["alpha"]; ok {
+		t.Fatalf("alpha 标记仍在: %+v", last)
+	}
+	if st, ok := last["beta"]; !ok || !st.OK {
+		t.Fatalf("beta 标记不应受影响: %+v", last)
+	}
+
+	// 模拟面板重启：清除结果必须落盘
+	s2 := NewAutoUpdateState()
+	_, _, last2, _ := s2.Snapshot()
+	if _, ok := last2["alpha"]; ok {
+		t.Fatalf("重启后 alpha 标记回来了: %+v", last2)
+	}
+	if st, ok := last2["beta"]; !ok || !st.OK {
+		t.Fatalf("重启后 beta 标记丢失: %+v", last2)
+	}
+}
+
 // 运行记录上限（超出滚动丢弃）
 func TestAutoUpdateStateCapsRuns(t *testing.T) {
 	t.Setenv("AutoUpdateHistoryFile", filepath.Join(t.TempDir(), "h.json"))

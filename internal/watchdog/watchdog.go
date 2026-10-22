@@ -10,6 +10,7 @@ package watchdog
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,34 @@ const (
 	baselineDelay     = 25 * time.Second // 面板启动后多久建立基线
 	recentCrashWindow = 10 * time.Minute // 首次见到时，多久内的异常退出也要告警
 )
+
+// DockHamster 更新容器时会保留一个旧容器备份：
+//   - 普通更新：<name>-YYYY-MM-DD-HH-MM-SS
+//   - 面板自更新：<name>-old-YYYY-MM-DD-HH-MM-SS
+//
+// 备份容器本来就是「被停止的旧容器」，不能按异常退出告警。
+var (
+	updateBackupNameRE     = regexp.MustCompile(`^(.+)-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}$`)
+	selfUpdateBackupNameRE = regexp.MustCompile(`^(.+)-old-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}$`)
+)
+
+// backupBaseName 识别 DockHamster 创建的备份容器，返回它对应的新容器名。
+func backupBaseName(name string) (string, bool) {
+	if m := selfUpdateBackupNameRE.FindStringSubmatch(name); m != nil {
+		return m[1], true
+	}
+	if m := updateBackupNameRE.FindStringSubmatch(name); m != nil {
+		return m[1], true
+	}
+	return "", false
+}
+
+// shouldIgnoreBackup 只在新容器正在运行时忽略旧备份；避免把用户自己命名的
+// 时间戳容器（没有对应新容器）也静默掉。
+func shouldIgnoreBackup(name string, running map[string]bool) bool {
+	base, ok := backupBaseName(name)
+	return ok && running[base]
+}
 
 // Config 由调用方注入（避免与 svc 包循环依赖）
 type Config struct {
@@ -107,14 +136,31 @@ func (w *Watchdog) Tick() {
 		return
 	}
 	now := time.Now()
+	running := make(map[string]bool, len(list))
+	for _, c := range list {
+		if c.State == "running" && len(c.Names) > 0 {
+			running[strings.TrimPrefix(c.Names[0], "/")] = true
+		}
+	}
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	// 清理过期的维护静默项（备份容器名每次都不同，不清理会无限增长）
+	for n, until := range w.silence {
+		if now.After(until) {
+			delete(w.silence, n)
+		}
+	}
 	for _, c := range list {
 		if len(c.Names) == 0 {
 			continue
 		}
 		name := strings.TrimPrefix(c.Names[0], "/")
+		// 更新/自更新留下的旧容器备份：新容器已经跑起来时不再告警。
+		// 这是持久化判断 —— 面板自更新会重启进程，内存里的 silence 会丢。
+		if shouldIgnoreBackup(name, running) {
+			continue
+		}
 		ins, err := w.cli.ContainerInspect(ctx, c.ID)
 		if err != nil || ins.State == nil {
 			continue

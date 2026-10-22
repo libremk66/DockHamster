@@ -190,6 +190,10 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
 	currentDate := time.Now().Format("2006-01-02-15-04-05")
 	backupName := name + "-" + currentDate
+	// 旧容器改名后是一个「新名字」，原名字的 15 分钟静默覆盖不到它；
+	// 在改名/停止的窗口内先给备份名也登记静默（守护的下一次巡检可能在
+	// 新容器启动前就扫到它）。
+	NoteMaintenance(serviceContext, backupName, 15*time.Minute)
 	err = serviceContext.DockerClient.ContainerRename(context.Background(), id, backupName)
 	if err != nil {
 		oldTaskProgress.Message = "重命名旧容器失败"

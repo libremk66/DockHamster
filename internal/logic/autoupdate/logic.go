@@ -280,6 +280,23 @@ func (l *AutoUpdateLogic) DeleteTaskHistory(ids []string) (*types.Resp, error) {
 	return resp, nil
 }
 
+// ClearStatus 清除某容器上次更新结果标记（用户已知晓，不再在列表里提示）。
+func (l *AutoUpdateLogic) ClearStatus(name string) (*types.Resp, error) {
+	resp := &types.Resp{}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		resp.Code = 400
+		resp.Msg = "未指定容器"
+		resp.Data = map[string]interface{}{}
+		return resp, nil
+	}
+	cleared := l.svcCtx.AutoUpdateState.ClearContainer(name)
+	resp.Code = 200
+	resp.Msg = "success"
+	resp.Data = map[string]interface{}{"cleared": cleared}
+	return resp, nil
+}
+
 // TestNotify 发送一条渠道测试消息（draft 为前端当前表单值；为空则用已保存配置）
 func (l *AutoUpdateLogic) TestNotify(channel string, draft *notify.Channel) (*types.Resp, error) {
 	resp := &types.Resp{}

@@ -523,6 +523,19 @@ func (s *AutoUpdateState) SetContainer(name string, ok bool, message string) {
 	s.persistLocked(false) // 每台完成都会调：节流写，避免高频 IO
 }
 
+// ClearContainer 清除某容器上次更新结果标记（用户在界面上确认已知晓）。
+// 返回是否真的清掉了一条记录。
+func (s *AutoUpdateState) ClearContainer(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.last[name]; !ok {
+		return false
+	}
+	delete(s.last, name)
+	s.persistLocked(true)
+	return true
+}
+
 // Snapshot 返回状态快照（并发安全）
 func (s *AutoUpdateState) Snapshot() (bool, []AutoUpdateRunResult, map[string]ContainerAutoStatus, []ActiveTask) {
 	s.mu.Lock()
