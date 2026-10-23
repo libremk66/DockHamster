@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -260,13 +261,51 @@ func volumeAgeSkipReason(createdAt string, untilHours int) string {
 	return ""
 }
 
+// filterProjectVolumesByName 按显式名单过滤"停用项目卷"：去空白/去重，按扫描顺序返回命中项；
+// 名单里但不在扫描结果中的名字单独返回（调用方记入 failed，避免"点了没反应"）。
+// 安全属性：只从 stat.ProjectVolumes 里挑——匿名卷、在用卷、项目仍活跃的卷
+// 永远不可能被名单命中，即使请求被手工构造。
+func filterProjectVolumesByName(vols []UnusedVolumeItem, names []string) (picked []UnusedVolumeItem, missing []string) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	want := make(map[string]bool, len(names))
+	var order []string
+	for _, raw := range names {
+		// form 编码时 go-zero 会把整个值塞进一个元素（"a,b"），这里一并拆开；
+		// 卷名本身不可能含逗号，拆分无歧义。
+		for _, part := range strings.Split(raw, ",") {
+			n := strings.TrimSpace(part)
+			if n == "" || want[n] {
+				continue
+			}
+			want[n] = true
+			order = append(order, n)
+		}
+	}
+	hit := map[string]bool{}
+	for _, v := range vols {
+		if want[v.Name] {
+			picked = append(picked, v)
+			hit[v.Name] = true
+		}
+	}
+	for _, n := range order {
+		if !hit[n] {
+			missing = append(missing, n)
+		}
+	}
+	return picked, missing
+}
+
 // PruneResources 清理未使用的卷与网络。
 //   - volumes=true：清匿名卷（无引用 + 过时间窗 + 二次校验仍无引用）
-//   - projectVolumes=true：额外清"项目已不存在"的有名卷（UI 需显式确认）
+//   - projectVolumes=true：额外清"项目已不存在"的有名卷（旧的全量开关；UI 已不再使用）
+//   - projectVolumeNames 非空：只清名单内的"停用项目卷"（逐卷勾选，优先级高于 projectVolumes）
 //   - networks=true：清未使用网络（系统网络白名单永不清理）
 //
 // 所有删除都逐条执行、单条失败不中断（daemon 引用检查是最后一道保险）。
-func PruneResources(svcCtx *svc.ServiceContext, pruneVolumes, pruneProjectVolumes, pruneNetworks bool) (removedVolumes []string, removedNetworks []string, failed map[string]string, err error) {
+func PruneResources(svcCtx *svc.ServiceContext, pruneVolumes, pruneProjectVolumes, pruneNetworks bool, projectVolumeNames []string) (removedVolumes []string, removedNetworks []string, failed map[string]string, err error) {
 	failed = map[string]string{}
 	stat, serr := CollectResourcesStat(svcCtx)
 	if serr != nil {
@@ -311,22 +350,31 @@ func PruneResources(svcCtx *svc.ServiceContext, pruneVolumes, pruneProjectVolume
 			removedVolumes = append(removedVolumes, v.Name)
 		}
 	}
-	if pruneProjectVolumes {
-		for _, v := range stat.ProjectVolumes {
-			if usedVolumes[v.Name] {
-				failed[v.Name] = "已被容器挂载（跳过）"
-				continue
-			}
-			if reason := volumeAgeSkipReason(v.CreatedAt, stat.UntilHours); reason != "" {
-				failed[v.Name] = reason
-				continue
-			}
-			if err := svcCtx.DockerClient.VolumeRemove(ctx, v.Name, false); err != nil {
-				failed[v.Name] = FriendlyDaemonError(err).Error()
-				continue
-			}
-			removedVolumes = append(removedVolumes, v.Name)
+	// 项目卷：有显式名单时只删名单内的（逐卷勾选），否则沿用旧的全量开关。
+	projectCandidates := stat.ProjectVolumes
+	if len(projectVolumeNames) > 0 {
+		picked, missing := filterProjectVolumesByName(stat.ProjectVolumes, projectVolumeNames)
+		for _, name := range missing {
+			failed[name] = "不在可清理列表（可能仍被容器使用、项目仍活跃或已被删除）"
 		}
+		projectCandidates = picked
+	} else if !pruneProjectVolumes {
+		projectCandidates = nil
+	}
+	for _, v := range projectCandidates {
+		if usedVolumes[v.Name] {
+			failed[v.Name] = "已被容器挂载（跳过）"
+			continue
+		}
+		if reason := volumeAgeSkipReason(v.CreatedAt, stat.UntilHours); reason != "" {
+			failed[v.Name] = reason
+			continue
+		}
+		if err := svcCtx.DockerClient.VolumeRemove(ctx, v.Name, false); err != nil {
+			failed[v.Name] = FriendlyDaemonError(err).Error()
+			continue
+		}
+		removedVolumes = append(removedVolumes, v.Name)
 	}
 	if pruneNetworks {
 		for _, n := range stat.Networks {

@@ -18,6 +18,7 @@ import (
 	migrate "github.com/libremk66/DockHamster/internal/handler/migrate"
 	progress "github.com/libremk66/DockHamster/internal/handler/progress"
 	projects "github.com/libremk66/DockHamster/internal/handler/projects"
+	registryauth "github.com/libremk66/DockHamster/internal/handler/registryauth"
 	resources "github.com/libremk66/DockHamster/internal/handler/resources"
 	selfupdate "github.com/libremk66/DockHamster/internal/handler/selfupdate"
 	snapshot "github.com/libremk66/DockHamster/internal/handler/snapshot"
@@ -405,6 +406,16 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Method:  http.MethodPost,
 				Path:    "/accelerator/pull",
 				Handler: accelerator.PullHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/registryAuth/settings",
+				Handler: registryauth.GetSettingsHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/registryAuth/settings",
+				Handler: registryauth.SaveSettingsHandler(serverCtx),
 			},
 			{
 				Method:  http.MethodGet,

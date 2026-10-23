@@ -75,16 +75,16 @@ func (l *ResourcesLogic) Stat() (resp *types.Resp, err error) {
 	return resp, nil
 }
 
-// Prune 执行清理：按请求里的三类开关逐项删除。
+// Prune 执行清理：按请求里的三类开关逐项删除（停用项目卷可带显式名单）。
 func (l *ResourcesLogic) Prune(req *types.PruneResourcesReq) (resp *types.Resp, err error) {
 	resp = &types.Resp{}
-	if !req.Volumes && !req.ProjectVolumes && !req.Networks {
+	if !req.Volumes && !req.ProjectVolumes && !req.Networks && len(req.ProjectVolumeNames) == 0 {
 		resp.Code = 400
 		resp.Msg = "未选择要清理的资源类型"
 		resp.Data = map[string]interface{}{}
 		return resp, nil
 	}
-	removedVols, removedNets, failed, perr := utiles.PruneResources(l.svcCtx, req.Volumes, req.ProjectVolumes, req.Networks)
+	removedVols, removedNets, failed, perr := utiles.PruneResources(l.svcCtx, req.Volumes, req.ProjectVolumes, req.Networks, req.ProjectVolumeNames)
 	if perr != nil {
 		resp.Code = 500
 		resp.Msg = utiles.FriendlyDaemonError(perr).Error()

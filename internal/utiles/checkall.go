@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/libremk66/DockHamster/internal/module"
 	"github.com/libremk66/DockHamster/internal/svc"
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -26,8 +27,17 @@ func CheckAllImageUpdates(svcCtx *svc.ServiceContext, trigger string) (int, int,
 		logx.Infof("检查更新：已有任务在运行，跳过本轮（%s）", trigger)
 		return 0, 0, nil
 	}
+	// 依赖：① 私有仓库凭据（ghcr 私有包不带凭据只会得到 unauthorized）
+	// ② 无 tag 镜像的可用引用（容器创建时的 Config.Image，让丢 tag 的镜像还能检测）
+	deps := module.CheckUpdateDeps{}
+	if svcCtx.RegistryAuth != nil {
+		deps.Auth = svcCtx.RegistryAuth
+	}
+	if refs := ImageRefsForUntaggedImages(svcCtx, list); len(refs) > 0 {
+		deps.RefFor = func(imageID string) string { return refs[imageID] }
+	}
 	need := 0
-	svcCtx.HubImageInfo.CheckUpdate(svcCtx.DockerClient, list, func(done, total, n int) {
+	svcCtx.HubImageInfo.CheckUpdateWithDeps(svcCtx.DockerClient, list, deps, func(done, total, n int) {
 		need = n
 		if state != nil {
 			state.Progress(done, n)

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/libremk66/DockHamster/internal/module"
 	"github.com/libremk66/DockHamster/internal/svc"
+	MyType "github.com/libremk66/DockHamster/internal/types"
 	"github.com/zeromicro/go-zero/core/logx"
 	"os"
 )
@@ -71,7 +72,16 @@ func CollectAutoUpdateTargets(serviceContext *svc.ServiceContext, settings modul
 				continue
 			}
 		}
-		targets = append(targets, AutoUpdateTarget{ID: c.ID, Name: name, PullRef: resolvePullRef(serviceContext, c.ImageID, c.Image)})
+		// fallback 是"没有 RepoTag 时"的拉取目标：优先容器列表里的引用；
+		// daemon 已把它退化成镜像 ID 时（同名 tag 被重新 pull 过），inspect 一次
+		// 拿创建时的 Config.Image——只在这一条罕见路径多打一次请求。
+		fallback := c.Image
+		if fallback == "" || IsBareImageID(fallback) {
+			if ins, ierr := serviceContext.DockerClient.ContainerInspect(ctx, c.ID); ierr == nil && ins.Config != nil {
+				fallback = ins.Config.Image
+			}
+		}
+		targets = append(targets, AutoUpdateTarget{ID: c.ID, Name: name, PullRef: resolvePullRef(serviceContext, c.ImageID, fallback)})
 	}
 	return targets, nil
 }
@@ -377,25 +387,28 @@ func oneLine(s string) string {
 }
 
 // resolvePullRef 取镜像的正式 RepoTag 作为拉取目标。
-// 找不到 tag 时返回空串（**不再回退到镜像 ID/原始引用**）——ID 不是可拉取的名称，
-// 回退只会把"更新/拉取"引向必然失败的路径（issue #4 的教训）；调用方见空串应明确跳过并说明原因。
+// 没有 RepoTag 时回退到 **校验过的** fallback（容器创建时的 Config.Image）——
+// 绝不能回退到镜像 ID（issue #4 的教训），但一个合法的引用是完全可用的拉取目标。
+// 两者都不可用时返回空串，调用方见空串应明确跳过并说明原因。
 func resolvePullRef(serviceContext *svc.ServiceContext, imageID string, fallback string) string {
 	images, err := GetImagesList(serviceContext)
-	if err == nil {
-		for _, img := range images {
-			if img.ID == imageID {
-				if len(img.RepoTags) > 0 {
-					return img.RepoTags[0]
-				}
-				return "" // 无 tag（悬空/本地构建）：不可作为拉取目标
-			}
-		}
+	if err != nil {
+		return PullableImageRef("", fallback)
 	}
-	// 列表里找不到该镜像（罕见）：仅当 fallback 是合法的带标签引用时才使用
-	if fallback != "" {
-		if normalized, verr := ValidateUpdateImageRef(fallback); verr == nil {
-			return normalized
+	return resolvePullRefFromImages(images, imageID, fallback)
+}
+
+// resolvePullRefFromImages 纯函数（便于单测）：有 RepoTag 用 tag；没有则用校验过的
+// 非裸 fallback；镜像不在列表里时同样只接受合法 fallback。
+func resolvePullRefFromImages(images []MyType.Image, imageID, fallback string) string {
+	for _, img := range images {
+		if img.ID != imageID {
+			continue
 		}
+		if len(img.RepoTags) > 0 {
+			return img.RepoTags[0]
+		}
+		return PullableImageRef("", fallback) // 无 tag（悬空/本地构建）：只能靠 fallback
 	}
-	return ""
+	return PullableImageRef("", fallback)
 }

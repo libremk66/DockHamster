@@ -104,7 +104,7 @@
 ### 8. 列表化界面与搜索
 
 - **容器页**：一行 = 一个容器，列：名称/镜像 · 状态 · 自动更新（行内开关 + 上次结果）· 可升级 · 操作；更新中该行下方展开进度子行
-- **镜像页**：一行 = 一个镜像，列：镜像 · 大小 · 使用情况（使用中/未使用药丸）· 创建时间 · 操作（Hub / 删除 / 强删）；悬空镜像标注"无标签（悬空）"
+- **镜像页**：一行 = 一个镜像，列：镜像 · 大小 · 使用情况（使用中/未使用药丸）· 创建时间 · 操作（Hub/GHCR 跳转 · 删除 / 强删）；悬空镜像标注"无标签（悬空）"；「Hub」按钮按镜像来源跳对应仓库页（Docker Hub → hub.docker.com，ghcr.io → GitHub Packages，其它 registry 不显示）
 - **搜索**：容器按名称/镜像、镜像按名称/Tag/ID 实时过滤，带"筛选出 X / 共 Y"计数与无结果提示
 - 交互保持不变：点行打开详情，Ctrl/Cmd+点击或批量模式勾选；统计卡筛选与搜索叠加生效
 - 移动端自动折行排版（每行折为「标题行 + 信息行 + 操作行」）
@@ -218,6 +218,20 @@ checksums.txt      校验和（sha256sum -c 可验证完整性）
 - `/api/containers` 增加 `ports` 字段（容器对外发布的 TCP 端口：去重、升序、**跳过仅绑回环的**）；容器行渲染为可点按钮，点击新标签打开 `http://<当前面板主机>:<端口>`
 - 图标优先级：容器自带/内置/自定义 logo → 容器网页 favicon（后端解析 `<link rel=icon>`，前端缓存 7 天）→ 渐变占位
 
+### 18. 私有镜像仓库凭据
+
+私有镜像（如 ghcr.io 的私有包）匿名查询只会得到 `unauthorized`，此前面板只能一律显示「无法检测」，更新也会失败。现在按 registry 配置凭据：
+
+- 「镜像」页 →「私有仓库」：按 registry host 添加用户名 / 密码（Docker Hub 建议用 Access Token；GitHub 用带 `read:packages` 的 PAT）
+- 凭据同时用于**更新检测**（走守护进程 `DistributionInspect`，失败回退自建 HTTP）与**拉取镜像**（`PullOptions.RegistryAuth`）
+- 密码保存后**不再回显**（接口只返回 `hasPassword`），编辑时留空 = 保持不变；落盘 `/data/config/registry-auth.json`（权限 0600）
+- 「无法检测」会区分原因：`auth`（未配置该仓库凭据，也可能是仓库不存在）/ `auth-bad`（已配凭据但被拒）/ `not-found`（仓库或标签不存在）/ `no-tag`（悬空或本地构建）
+
+### 19. 资源清理（未使用卷 / 网络 / 构建中间层）
+
+- 「镜像」页统计卡第 6 格进入清理视图：匿名卷（容器重建遗留）、未使用网络、构建中间层
+- **停用项目的卷**（带 compose 项目标签、项目已不存在）单独列出，**逐卷勾选**后点「清理选中」，确认框列出具体卷名；后端只删名单内的，且仍受 24 小时时间窗与实时引用二次校验保护——匿名卷、在用卷、项目仍活跃的卷不可能被名单命中
+
 ## 二、环境变量（仅初始默认值）
 
 环境变量只在 `/data/config/autoUpdate.json` **不存在时**用于生成初始配置；之后一律以页面配置为准。
@@ -231,6 +245,7 @@ checksums.txt      校验和（sha256sum -c 可验证完整性）
 | `FeishuWebhook` | 空 | 飞书 Webhook 初始值（写入 notify.feishu） |
 | `AutoUpdateConfigFile` | `/data/config/autoUpdate.json` | 配置文件路径覆盖 |
 | `AcceleratorConfigFile` | `/data/config/accelerator.json` | 加速源配置路径覆盖 |
+| `RegistryAuthConfigFile` | `/data/config/registry-auth.json` | 私有仓库凭据配置路径覆盖 |
 | `DelOldContainer` | `true` | 既有变量：更新后是否删除旧容器（`false` 保留改名后的旧容器） |
 | `COMPOSE_ALT_ROOTS` | 空 | Compose 文件备用根前缀，逗号分隔；同一数据卷在面板里挂到别的路径时兜底（也可在「Compose」页高级设置里配置） |
 
@@ -266,6 +281,10 @@ checksums.txt      校验和（sha256sum -c 可验证完整性）
 | POST | `/api/accelerator/settings` | 保存加速源配置 |
 | POST | `/api/accelerator/test` | 并发测速（`{sources[]}` 可选，空则测当前列表；返回延迟与可用性） |
 | POST | `/api/accelerator/pull` | 加速拉取镜像（`{source, image}`，异步返回 taskID，进度走 `/api/progress/:id`） |
+| GET | `/api/registryAuth/settings` | 读取私有仓库凭据（密码不回传，只给 `hasPassword`） |
+| POST | `/api/registryAuth/settings` | 保存私有仓库凭据（`{entries:[{registry,username,password}]}`，密码留空=沿用旧值） |
+| GET | `/api/resources/unused` | 资源清理统计（匿名卷 / 停用项目卷 / 未使用网络） |
+| POST | `/api/resources/prune` | 执行清理（`{volumes,projectVolumes,networks,projectVolumeNames[]}`） |
 | GET | `/api/selfUpdate/status` | 面板自更新状态（当前版本 / 自身容器 / 上次更新结果） |
 | POST | `/api/selfUpdate/run` | 一键面板自更新（异步返回 taskID） |
 | GET | `/api/favicon/resolve?url=` | 解析目标页面 favicon（抓 `<link rel=icon>`，失败回落 /favicon.ico） |
@@ -313,6 +332,11 @@ internal/module/accelerator.go     新增：加速源配置存储
 internal/utiles/imageref.go        新增：Docker Hub 镜像引用解析（加速源前缀）
 internal/utiles/pullviaaccelerator.go 新增：加速拉取与"更新时自动加速"（失败回退直连）
 internal/utiles/healthcheck.go     新增：更新后健康校验 + 回滚（含静默窗口登记）
+internal/module/registryauth.go    新增：私有仓库凭据存储（按 registry host；两种编码：DaemonAuth / BasicAuth）
+internal/logic/registryauth/ + handler/registryauth/  新增：私有仓库凭据 API
+internal/utiles/resources.go       新增：资源清理（匿名卷 / 停用项目卷名单 / 未使用网络）
+internal/utiles/imageref_resolve.go 新增：可拉取镜像引用解析（裸镜像 ID 时回退容器创建时的 Config.Image）
+internal/utiles/imageprune.go      新增：构建中间层统计与清理
 internal/utiles/publishedports.go  新增：容器对外端口提取（供端口直达）
 internal/logic/accelerator/ + handler/accelerator/  新增：加速源 API
 internal/logic/selfupdate/ + handler/selfupdate/    新增：自更新 API
@@ -321,7 +345,7 @@ internal/utiles/stopcontainer.go / restartcontainer.go  修改：登记守护静
 ```
 
 前端（[libremk66/DockHamster-UI](https://github.com/libremk66/DockHamster-UI)）：
-`src/components/AutoUpdate.jsx`（自动更新页：白名单/进度/旧镜像策略/容器异常告警开关）、`NotifyChannels.jsx`（通知渠道卡片：➕ 添加 / 配置弹窗 / 测试 / 即时保存）、`Tasks.jsx`（「任务」页：进行中 + 历史记录，多选删除）、`Containers.jsx`（列表化/搜索/开关/整组弹窗/进度子行/回滚入口/端口直达/本面板标识）、`Images.jsx`（列表化/搜索/快照分类/加速拉取入口）、`Migrate.jsx`（迁移页：体检/导出/导入）、`Accelerator.jsx`（加速源面板 + 加速拉取弹窗）、`SelfUpdate.jsx`（面板自更新）、`ContainerLogo.jsx`（图标：内置/自定义 logo → favicon 兜底）、`ProgressBar.jsx`、`Header.jsx`、`App.jsx`、`api/client.js`、`utils/webFavicon.js`、`utils/format.js`。
+`src/components/AutoUpdate.jsx`（自动更新页：白名单/进度/旧镜像策略/容器异常告警开关）、`NotifyChannels.jsx`（通知渠道卡片：➕ 添加 / 配置弹窗 / 测试 / 即时保存）、`Tasks.jsx`（「任务」页：进行中 + 历史记录，多选删除）、`Containers.jsx`（列表化/搜索/开关/整组弹窗/进度子行/回滚入口/端口直达/本面板标识）、`Images.jsx`（列表化/搜索/快照分类/加速拉取入口）、`Migrate.jsx`（迁移页：体检/导出/导入）、`Accelerator.jsx`（加速源面板 + 加速拉取弹窗）、`RegistryAuth.jsx`（私有仓库凭据）、`Resources.jsx`（资源清理视图）、`utils/registry.js` / `utils/imageRef.js` / `utils/uncheckable.js`（仓库链接 / 镜像引用兜底 / 无法检测提示）、`SelfUpdate.jsx`（面板自更新）、`ContainerLogo.jsx`（图标：内置/自定义 logo → favicon 兜底）、`ProgressBar.jsx`、`Header.jsx`、`App.jsx`、`api/client.js`、`utils/webFavicon.js`、`utils/format.js`。
 
 ## 五、版本与发布机制
 

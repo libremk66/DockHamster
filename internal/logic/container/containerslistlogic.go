@@ -30,7 +30,9 @@ type Info struct {
 	RunningTime string             `json:"runningTime"`
 	HaveUpdate  bool               `json:"haveUpdate"`
 	Uncheckable bool               `json:"uncheckable"`
-	Ports       []string           `json:"ports"`
+	// UncheckableReason 无法检测的原因（no-tag / auth / not-found），前端据此给不同提示
+	UncheckableReason string   `json:"uncheckableReason,omitempty"`
+	Ports             []string `json:"ports"`
 	IsSelf      bool               `json:"isSelf"`
 	Compose     utiles.ComposeMeta `json:"compose"`
 }
@@ -68,12 +70,6 @@ func (l *ContainersListLogic) ContainersList() (resp *types.Resp, err error) {
 			containerInfo.Name = "get container name error"
 			l.Error("get container name error" + v.ID)
 		}
-		if v.Image != "" {
-			containerInfo.UsingImage = v.Image
-		} else {
-			containerInfo.UsingImage = v.ImageID
-			l.Error("image dont have name" + v.ID)
-		}
 		containerInspect, err := utiles.GetContainerInspect(l.svcCtx, v.ID)
 		if err != nil {
 			containerInfo.CreateImage = ""
@@ -83,11 +79,29 @@ func (l *ContainersListLogic) ContainersList() (resp *types.Resp, err error) {
 			containerInfo.Ports = utiles.PublishedTCPPorts(containerInspect)
 			containerInfo.Compose = utiles.ComposeMetaFromLabels(containerInspect.Config.Labels)
 		}
+		// UsingImage 供前端显示与"更新"回填：daemon 在"记录的引用已不指向该镜像"时
+		// 会把 list 的 Image 退化成镜像 ID（moby daemon/list.go refreshImage）。这时用
+		// 容器创建时的 Config.Image（上面本来就 inspect 了，无额外请求），否则前端会把
+		// ID 当镜像名回填 → 更新被 ValidateUpdateImageRef 拒绝，容器永远更新不了。
+		using := v.Image
+		if using == "" || utiles.IsBareImageID(using) {
+			if containerInfo.CreateImage != "" && !utiles.IsBareImageID(containerInfo.CreateImage) {
+				if _, verr := utiles.ValidateUpdateImageRef(containerInfo.CreateImage); verr == nil {
+					using = containerInfo.CreateImage
+				}
+			}
+			if using == "" || utiles.IsBareImageID(using) {
+				using = v.ImageID
+				l.Error("image dont have name" + v.ID)
+			}
+		}
+		containerInfo.UsingImage = using
 		t := time.Unix(v.Created, 0)
 		containerInfo.CreateTime = t.Format("2006-01-02 15:04:05")
 		containerInfo.RunningTime = v.Status
 		containerInfo.HaveUpdate = v.Update
 		containerInfo.Uncheckable = v.Uncheckable
+		containerInfo.UncheckableReason = v.UncheckableReason
 		containerInfo.IsSelf = selfupdate.IsSelf(v.ID)
 		containerInfoList = append(containerInfoList, containerInfo)
 	}

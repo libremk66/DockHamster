@@ -176,7 +176,12 @@ func PullImageForTasks(svcCtx *svc.ServiceContext, taskIDs []string, imageRef st
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), pullTimeout)
 	defer cancel()
-	reader, err := svcCtx.DockerClient.ImagePull(ctx, imageRef, image.PullOptions{})
+	// 私有仓库（ghcr 私有包等）：带上面板里配的凭据；没有配置时为空 = 匿名（行为不变）
+	pullOpts := image.PullOptions{}
+	if svcCtx.RegistryAuth != nil {
+		pullOpts.RegistryAuth = svcCtx.RegistryAuth.DaemonAuth(imageRef)
+	}
+	reader, err := svcCtx.DockerClient.ImagePull(ctx, imageRef, pullOpts)
 	if err != nil {
 		return FriendlyPullError(imageRef, err)
 	}

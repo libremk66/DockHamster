@@ -112,7 +112,11 @@ type RemoveImageReq struct {
 type PruneResourcesReq struct {
 	Volumes        bool `form:"volumes,default=false" json:"volumes,optional"`
 	ProjectVolumes bool `form:"projectVolumes,default=false" json:"projectVolumes,optional"`
-	Networks       bool `form:"networks,default=false" json:"networks,optional"`
+	// ProjectVolumeNames 停用项目卷的**显式名单**（UI 逐卷勾选后提交）。
+	// 非空时只删名单内的卷，ProjectVolumes 开关被忽略——停用项目卷可能装着旧数据，
+	// 不能靠一个"全删"开关；名单之外的一律不动。
+	ProjectVolumeNames []string `form:"projectVolumeNames,optional" json:"projectVolumeNames,optional"`
+	Networks           bool     `form:"networks,default=false" json:"networks,optional"`
 }
 
 type RenameContainerReq struct {

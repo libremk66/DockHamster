@@ -35,6 +35,8 @@ type ComposeServiceView struct {
 	State       string `json:"state"`
 	HaveUpdate  bool   `json:"haveUpdate"`
 	Uncheckable bool   `json:"uncheckable"`
+	// UncheckableReason 无法检测的原因（no-tag / auth / not-found），前端据此给不同提示
+	UncheckableReason string `json:"uncheckableReason,omitempty"`
 }
 
 // ComposeProjectView 一个 compose 项目。
@@ -265,9 +267,17 @@ func BuildComposeProjectsView(svcCtx *svc.ServiceContext, selfContainerID string
 		if len(c.Names) > 0 {
 			name = strings.TrimPrefix(c.Names[0], "/")
 		}
+		// 镜像引用同样防"daemon 退化成裸 ID"：这里已经 inspect 过，用创建时的 Config.Image 兜底
+		imgRef := c.Image
+		if ins.Config != nil {
+			if r := PullableImageRef(c.Image, ins.Config.Image); r != "" {
+				imgRef = r
+			}
+		}
 		acc.view.Services = append(acc.view.Services, ComposeServiceView{
-			ID: c.ID, Name: name, Service: meta.Service, Image: c.Image,
+			ID: c.ID, Name: name, Service: meta.Service, Image: imgRef,
 			State: c.State, HaveUpdate: c.Update, Uncheckable: c.Uncheckable,
+			UncheckableReason: c.UncheckableReason,
 		})
 	}
 

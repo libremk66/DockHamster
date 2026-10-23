@@ -32,6 +32,8 @@ type ServiceContext struct {
 	TaskHistory *module.TaskHistoryStore
 	// 镜像加速源（UI 配）
 	Accelerator *module.AcceleratorStore
+	// 私有镜像仓库凭据（UI 配；ghcr.io 等私有包的检测更新与拉取用）
+	RegistryAuth *module.RegistryAuthStore
 	// Compose 配置自动备份（WebDAV，UI 配）
 	ComposeBackup       *module.ComposeBackupStore
 	AutoUpdateState     *module.AutoUpdateState
@@ -75,6 +77,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		AutoUpdate:      module.NewAutoUpdateStore(),
 		TaskHistory:     module.NewTaskHistoryStore(),
 		Accelerator:     module.NewAcceleratorStore(),
+		RegistryAuth:    module.NewRegistryAuthStore(),
 		AutoUpdateState: module.NewAutoUpdateState(),
 		AutoUpdateCheck: module.NewCheckState(),
 		ComposeBackup:   module.NewComposeBackupStore(),
