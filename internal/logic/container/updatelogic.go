@@ -85,7 +85,7 @@ func (l *UpdateLogic) Update(req *types.ContainerUpdateReq) (resp *types.Resp, e
 		}
 	}()
 	resp.Code = 200
-	resp.Msg = "success"
+	resp.Msg = "任务已提交，请在任务页查看结果"
 	resp.Data = map[string]string{"taskID": taskID}
 	return resp, nil
 }

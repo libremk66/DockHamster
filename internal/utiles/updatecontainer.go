@@ -162,6 +162,26 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	}
 	oldImageID := inspectedContainer.Image
 	wasRunning := inspectedContainer.State != nil && inspectedContainer.State.Running
+	oldRestartPolicy := inspectedContainer.HostConfig.RestartPolicy
+	restoreOldRestartPolicy := func() {
+		if oldRestartPolicy.IsNone() {
+			return
+		}
+		if _, uerr := serviceContext.DockerClient.ContainerUpdate(ctx, id, container.UpdateConfig{
+			RestartPolicy: oldRestartPolicy,
+		}); uerr != nil {
+			logx.Errorf("更新 %s：恢复旧容器重启策略失败: %v", name, uerr)
+		}
+	}
+	// 先禁用重启再 stop：否则 restart=always 的旧容器可能在更新窗口内被再次拉起，
+	// 除了导致后面的删除失败，还可能抢占新容器的端口。回滚/中止时会恢复原策略。
+	if wasRunning && !oldRestartPolicy.IsNone() {
+		if _, uerr := serviceContext.DockerClient.ContainerUpdate(ctx, id, container.UpdateConfig{
+			RestartPolicy: container.RestartPolicy{Name: container.RestartPolicyDisabled},
+		}); uerr != nil {
+			logx.Errorf("更新 %s：更新前禁用旧容器重启策略失败（删除阶段会再兜底）: %v", name, uerr)
+		}
+	}
 
 	oldTaskProgress.Percentage = 62
 	oldTaskProgress.Message = "正在停止容器"
@@ -173,6 +193,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	}
 	err = serviceContext.DockerClient.ContainerStop(context.Background(), id, stopOptions)
 	if err != nil {
+		restoreOldRestartPolicy()
 		oldTaskProgress.Message = "停止容器失败"
 		oldTaskProgress.DetailMsg = FriendlyDaemonError(err).Error()
 		oldTaskProgress.IsDone = true
@@ -196,6 +217,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	NoteMaintenance(serviceContext, backupName, 15*time.Minute)
 	err = serviceContext.DockerClient.ContainerRename(context.Background(), id, backupName)
 	if err != nil {
+		restoreOldRestartPolicy()
 		oldTaskProgress.Message = "重命名旧容器失败"
 		oldTaskProgress.DetailMsg = FriendlyDaemonError(err).Error()
 		oldTaskProgress.IsDone = true
@@ -212,6 +234,7 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 	serviceContext.UpdateProgress(taskID, oldTaskProgress)
 	// 回滚：新旧替换阶段任何失败都恢复旧容器（改名备份 → 原样启动）
 	rollback := func(reason string) error {
+		restoreOldRestartPolicy()
 		rbErr := RollbackUpdate(serviceContext, name, id, name, wasRunning)
 		msg := "更新失败：" + reason + "，已回滚旧容器"
 		if rbErr != nil {
@@ -275,8 +298,26 @@ func updateContainerCore(serviceContext *svc.ServiceContext, id string, name str
 			return OldImageOutcome{}, rollback(reason)
 		}
 	}
+	// 新容器已通过健康校验，旧容器进入备份/清理阶段。
+	// 旧容器可能配置 restart=always，或在中途被外部操作重新拉起；直接删除会因
+	// "container is running" 失败，残留成新旧双实例（2026-10-25 Emby 实测）。
+	// 先关掉重启策略并确认停止；删除时再以 Force 兜底。
+	oldTaskProgress.Percentage = 88
+	oldTaskProgress.Message = "正在处理旧容器"
+	oldTaskProgress.DetailMsg = "正在处理旧容器"
+	serviceContext.UpdateProgress(taskID, oldTaskProgress)
+	if _, uerr := serviceContext.DockerClient.ContainerUpdate(ctx, id, container.UpdateConfig{
+		RestartPolicy: container.RestartPolicy{Name: container.RestartPolicyDisabled},
+	}); uerr != nil {
+		logx.Errorf("更新 %s：禁用旧容器重启策略失败，继续尝试清理: %v", name, uerr)
+	}
+	if insp, ierr := serviceContext.DockerClient.ContainerInspect(ctx, id); ierr == nil && insp.State != nil && insp.State.Running {
+		if serr := serviceContext.DockerClient.ContainerStop(context.Background(), id, stopOptions); serr != nil {
+			logx.Errorf("更新 %s：旧容器再次停止失败，继续尝试强制清理: %v", name, serr)
+		}
+	}
 	if opts.DelOldContainer {
-		err = serviceContext.DockerClient.ContainerRemove(context.Background(), id, container.RemoveOptions{})
+		err = serviceContext.DockerClient.ContainerRemove(context.Background(), id, container.RemoveOptions{Force: true})
 		if err != nil {
 			oldTaskProgress.Message = "删除旧容器失败"
 			oldTaskProgress.DetailMsg = FriendlyDaemonError(err).Error()
