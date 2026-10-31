@@ -36,6 +36,7 @@
 **核心一句话**：会自己看、自己更新、出问题自己回滚；全程可见、可追溯、能通知。
 
 - ⚡ **自动更新**：白名单 + cron 计划；「检查更新」独立可配，随点随查
+- 🔁 **限流自动重试**：拉取遇到临时限流（429 / `toomanyrequests`）或连接瞬断时自动退避重试，不再失败一次就等下一轮
 - 🗑️ **旧镜像清理**：引用计数保护，还有容器在用就绝不删
 - 👥 **整组更新**：共用镜像只拉一次、依次重建
 - 🔔 **通知 8 渠道**：飞书 / 企业微信 / QQ 官方机器人 / 钉钉 / Bark / Server酱 / Telegram / Webhook
@@ -182,6 +183,8 @@ compose 管理的容器的更新自动走 compose 通道：`docker compose up -d
 
 💡 **共用同一镜像的多个容器**（例如两个 syncthing）建议**都勾上**：同一镜像只拉取一次，然后依次更新；旧镜像在最后一个使用者更新完成后才清理，未勾选的容器会一直提示「有新版本」。
 
+💡 拉取遇到临时限流（例如 GHCR 的 `toomanyrequests`）会自动退避重试；仍失败时可在「仓库凭据」配置 ghcr.io 的 GitHub Token（`read:packages`）。Docker Hub 加速源只对 Docker Hub 镜像生效，对 ghcr.io / lscr.io 无效。
+
 ⚠️ 自动更新会重建容器（等价于 `docker compose up -d` 的效果），请自行评估服务中断影响。
 
 💡 通知卡片里还有一个默认开启的 **「容器异常告警」** 开关：容器意外退出 / 被 OOM / 反复重启会走同一套通知渠道推送（面板主动操作不误报）。
@@ -199,7 +202,7 @@ DockHamster 的前身是原项目的一个增强分支，现已作为独立项�
 > 还有每一位提交 Issue、给出建议的使用者——本项目的多项修复（如"更新完仍提示有更新"）都由你们的反馈推动。
 
 - 本项目的多项通用修复已向上游提交 PR（[#166](https://github.com/onlyLTY/dockerCopilot/pull/166)），欢迎去官方 issue 下 +1
-- 完整功能与 API 说明见 [FEATURES.md](./FEATURES.md)；上游原始 README 备份见 [README.upstream.md](./README.upstream.md)
+- 完整功能与 API 说明见 [FEATURES.md](./FEATURES.md)；版本变更记录见 [CHANGELOG.md](./CHANGELOG.md)；上游原始 README 备份见 [README.upstream.md](./README.upstream.md)
 
 ## 八、许可
 
