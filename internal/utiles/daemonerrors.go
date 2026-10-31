@@ -153,7 +153,16 @@ var daemonErrRules = []daemonErrRule{
 	// ── 拉取 / 网络 ────────────────────────────────────────────
 	{
 		substr: "toomanyrequests", keepRaw: true,
-		msg: func(string) string {
+		msg: func(raw string) string {
+			// GHCR（以及重定向到它的 lscr.io）的限流报文长这样：
+			//   toomanyrequests: retry-after: 783µs, allowed: 44000/minute
+			// 与 Docker Hub 的 "You have reached your pull rate limit" 不同源，
+			// 加速源和 Hub 登录对它都无效，别给错建议。
+			low := strings.ToLower(raw)
+			if strings.Contains(low, "allowed:") && strings.Contains(low, "/minute") ||
+				strings.Contains(low, "ghcr.io") || strings.Contains(low, "lscr.io") {
+				return "GitHub 容器镜像库（ghcr.io / lscr.io）匿名拉取被临时限流；通常几十秒后自动重试即可恢复。可多等一会儿再试，或在「仓库凭据」里配置 ghcr.io 的 GitHub Token（read:packages）使用认证配额（Docker Hub 加速源对这类镜像无效）"
+			}
 			return "Docker Hub 匿名拉取已达上限（临时限流）；开启「更新时自动走加速源」或登录 Hub 账号可绕开"
 		},
 	},

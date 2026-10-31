@@ -41,6 +41,15 @@ func TestFriendlyDaemonError(t *testing.T) {
 			[]string{"Docker Hub 匿名拉取已达上限", "加速源"},
 		},
 		{
+			// GHCR 的限流报文：不能被误判成 Docker Hub（加速源 / Hub 登录都无效）
+			`Error response from daemon: toomanyrequests: retry-after: 783.622µs, allowed: 44000/minute`,
+			[]string{"GitHub 容器镜像库", "ghcr.io", "read:packages"},
+		},
+		{
+			`toomanyrequests: retry-after: 211.358µs, allowed: 44000/minute lscr.io/example/app`,
+			[]string{"GitHub 容器镜像库", "lscr.io"},
+		},
+		{
 			`Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?`,
 			[]string{"连不上 Docker", "docker.sock"},
 		},

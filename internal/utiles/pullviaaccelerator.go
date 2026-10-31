@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 
@@ -144,6 +146,129 @@ func pullImageViaMirrorFor(svcCtx *svc.ServiceContext, taskIDs []string, source,
 	return nil
 }
 
+// pullRetryDelays 直连拉取遇到瞬时限流/网络错误时的退避序列。
+// 变量而非常量，便于单测把等待压缩到毫秒级；默认 4 次尝试（首次 + 3 次重试）。
+// 限流窗口通常按分钟计，退避要跨过整分钟；retry-after 若更大则以其为准。
+var pullRetryDelays = []time.Duration{5 * time.Second, 30 * time.Second, 2 * time.Minute}
+
+// pullRetryMinWait 单次退避下限；测试里可调小。
+var pullRetryMinWait = time.Second
+
+// isRetriablePullError 判断错误是否值得重试。
+// 只放瞬态错误：仓库限流、连接中断、握手超时；manifest unknown / 认证失败等永久错误不重试。
+func isRetriablePullError(err error) bool {
+	if err == nil {
+		return false
+	}
+	low := strings.ToLower(err.Error())
+	for _, kw := range []string{
+		"toomanyrequests",
+		"pull rate limit",
+		"429 too many requests",
+		"unexpected eof",
+		"connection reset",
+		"connection refused",
+		"tls handshake timeout",
+		"i/o timeout",
+		"拉取流提前结束",
+	} {
+		if strings.Contains(low, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// retryAfterFromError 读取错误里的 retry-after（支持 µs/ms/s/纯数字秒）。
+// 服务端给的值只作下限参考：GHCR 常回几百微秒，短到没有实际意义。
+func retryAfterFromError(err error) time.Duration {
+	if err == nil {
+		return 0
+	}
+	low := strings.ToLower(err.Error())
+	i := strings.Index(low, "retry-after:")
+	if i < 0 {
+		return 0
+	}
+	raw := strings.TrimSpace(low[i+len("retry-after:"):])
+	if j := strings.IndexAny(raw, ",;)\n\t "); j >= 0 {
+		raw = raw[:j]
+	}
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+	if d, perr := time.ParseDuration(raw); perr == nil && d > 0 {
+		return d
+	}
+	if n, perr := strconv.Atoi(raw); perr == nil && n > 0 {
+		return time.Duration(n) * time.Second
+	}
+	return 0
+}
+
+// pullRetryWait 第 attempt 次失败后的等待时间（attempt 从 1 开始）：
+// max(退避序列, retry-after)，夹在 1s..2min 之间，再加 ±10% 抖动避免多容器同时重试。
+func pullRetryWait(err error, attempt int) time.Duration {
+	base := pullRetryDelays[len(pullRetryDelays)-1]
+	if attempt >= 1 && attempt <= len(pullRetryDelays) {
+		base = pullRetryDelays[attempt-1]
+	}
+	if d := retryAfterFromError(err); d > base {
+		base = d
+	}
+	if base < pullRetryMinWait {
+		base = pullRetryMinWait
+	}
+	if base > 2*time.Minute {
+		base = 2 * time.Minute
+	}
+	jitter := time.Duration(rand.Int63n(int64(base)/5+1)) - base/10
+	return base + jitter
+}
+
+// pullAttempt 单次直连拉取（ImagePull + 消费进度流）。抽成变量便于单测
+// 用假实现验证重试循环，不必真的起 registry / 连 Docker。
+var pullAttempt = func(svcCtx *svc.ServiceContext, ctx context.Context, taskIDs []string, imageRef string, pullOpts image.PullOptions) error {
+	reader, err := svcCtx.DockerClient.ImagePull(ctx, imageRef, pullOpts)
+	if err == nil {
+		if len(taskIDs) > 0 {
+			err = decodePullResp(reader, svcCtx, taskIDs)
+		} else {
+			err = consumePullStream(reader)
+		}
+	}
+	if err != nil {
+		return FriendlyPullError(imageRef, err)
+	}
+	return nil
+}
+
+// pullDirectWithRetry 直连拉取并在瞬态错误上重试。
+// 每次重试都重新发起 ImagePull（流内 429 与调用本身失败走同一条路），
+// 总时长受外层 ctx（pullTimeout）约束，不会因重试无限挂住。
+func pullDirectWithRetry(svcCtx *svc.ServiceContext, ctx context.Context, taskIDs []string, imageRef string, pullOpts image.PullOptions) error {
+	for attempt := 1; ; attempt++ {
+		err := pullAttempt(svcCtx, ctx, taskIDs, imageRef, pullOpts)
+		if err == nil {
+			return nil
+		}
+		if attempt > len(pullRetryDelays) || !isRetriablePullError(err) || ctx.Err() != nil {
+			return err
+		}
+		wait := pullRetryWait(err, attempt)
+		logx.Errorf("拉取 %s 失败（第 %d 次）：%v；%s 后重试", imageRef, attempt, err, wait)
+		setTaskMessage(svcCtx, taskIDs, fmt.Sprintf(
+			"拉取失败（%s），%s 后自动重试（%d/%d）",
+			oneLine(err.Error()), wait.Round(time.Second), attempt+1, len(pullRetryDelays)+1))
+		select {
+		case <-time.After(wait):
+		case <-ctx.Done():
+			return err
+		}
+	}
+}
+
 // PullImageForUpdate 单任务拉取入口（更新流程/自更新用）
 func PullImageForUpdate(svcCtx *svc.ServiceContext, taskID, imageRef string) error {
 	var ids []string
@@ -181,12 +306,5 @@ func PullImageForTasks(svcCtx *svc.ServiceContext, taskIDs []string, imageRef st
 	if svcCtx.RegistryAuth != nil {
 		pullOpts.RegistryAuth = svcCtx.RegistryAuth.DaemonAuth(imageRef)
 	}
-	reader, err := svcCtx.DockerClient.ImagePull(ctx, imageRef, pullOpts)
-	if err != nil {
-		return FriendlyPullError(imageRef, err)
-	}
-	if len(taskIDs) > 0 {
-		return FriendlyPullError(imageRef, decodePullResp(reader, svcCtx, taskIDs))
-	}
-	return FriendlyPullError(imageRef, consumePullStream(reader))
+	return pullDirectWithRetry(svcCtx, ctx, taskIDs, imageRef, pullOpts)
 }

@@ -188,10 +188,11 @@ func (s *AutoUpdateSettings) ResolveOldImagePolicy(containerName string) string 
 
 func defaultAutoSettings() AutoUpdateSettings {
 	se := AutoUpdateSettings{
-		Enabled:         false,
-		Containers:      []string{},
-		Exclude:         []string{},
-		Cron:            "0 4 * * *",
+		Enabled:    false,
+		Containers: []string{},
+		Exclude:    []string{},
+		// 错开整点：自更新工具普遍排在 00 分，GHCR 等仓库在整点更容易触发匿名限流
+		Cron:            "7 4 * * *",
 		DeleteOldImage:  true,
 		NotifyOnSuccess: true,
 		NotifyOnFailure: true,

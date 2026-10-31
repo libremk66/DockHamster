@@ -2,6 +2,23 @@
 
 本项目的用户可见变更记录。版本号以仓库根目录 `version` 文件为准。
 
+## v1.8.2 — 2026-10-31
+
+### 修复
+
+- 拉取镜像遇到临时限流（`toomanyrequests` / 429）或连接瞬断时自动退避重试（默认最多 4 次），定时自动更新不再“失败一次就等下一轮”，与手动更新的表现一致。
+- 修正限流提示：GHCR（ghcr.io / lscr.io）匿名限流不再被误报为 Docker Hub，并给出正确处置方式（配置 ghcr.io 凭据或稍后重试）；Docker Hub 加速源对这类镜像无效。
+
+### 优化
+
+- 自动更新默认计划改为 04:07（错峰），减少整点与全球自更新高峰撞车。
+
+### 升级说明
+
+- 无破坏性变更，无数据库 / 迁移。
+- 镜像：`libremk66/dockhamster:v1.8.2`（`latest` 同步更新，多架构 amd64/arm64）。
+- 更新方式：面板内更新 `dockhamster` 容器，或 `docker compose pull && docker compose up -d`。
+
 ## v1.8.1 — 2026-10-25
 
 ### 修复
@@ -24,5 +41,6 @@
 - 镜像：`libremk66/dockhamster:v1.8.1`（`latest` 同步更新，多架构 amd64/arm64）。
 - 更新方式：面板内更新 `dockhamster` 容器，或 `docker compose pull && docker compose up -d`。
 
-[Unreleased]: https://github.com/libremk66/DockHamster/compare/v1.8.1...HEAD
+[Unreleased]: https://github.com/libremk66/DockHamster/compare/v1.8.2...HEAD
+[v1.8.2]: https://github.com/libremk66/DockHamster/compare/v1.8.1...v1.8.2
 [v1.8.1]: https://github.com/libremk66/DockHamster/compare/v1.8.0...v1.8.1
